@@ -1,0 +1,5 @@
+TODO:
+
+* Create ASM targets
+* Create Interpreter (Have to determine what language first)
+* Fix floats only print the first digit after the decimal correctly

@@ -1,0 +1,103 @@
+import ../codegen/codegen
+import pattern
+
+var vm_debug*: bool = C_setDebug(false)
+var vm_file_out*: string = ""
+var vm_file_in*: string = ""
+var vm_build*: bool = false
+var vm_run*:bool = false
+
+
+proc join(list: seq[auto], sep: string = ""): string =
+    let length: int = list.len-1
+    var outstr: string = ""
+    for i in 0..length:
+        if i < length:
+            outstr = outstr & $list[i] & sep
+        else:
+            outstr = outstr & $list[i]
+    return outstr
+        
+
+proc displayHelpMessage(): void =
+    const message_head: string = "Usage: gravity <command> <options?>"
+    const message_body: seq[string] = @[
+        "Commands:",
+        "  disassemble            Disassembles the given bytecode file and displays each intruction",
+        "  build                  Compile the given bytecode file",
+        "  run                    Compile and run the given bytecode file",
+        "Options:",
+        "  -o:[output_file]       Set the output file",
+        "  -i:[input_file]        Set the input file",
+        "  --help                 Display this message and exit",
+        "  --keep-intermediate    Prevent clean-up after execution, keeping all intermediate files"
+    ]
+    echo message_head & "\n" & message_body.join("\n")
+    quit()
+
+
+proc parseArgs*(argc: int, argv: seq[string]): void =
+    if argc == 0:
+        displayHelpMessage()
+    else:
+        for i in 0..(argc-1):
+            var arg: string = argv[i]
+            case arg[0]:
+            of '-':
+                arg = arg[1..<arg.len]
+                # Output file
+                if (arg <?> "o:").Result:
+                    let fname:string = arg.chomp("o:") 
+                    vm_file_out = C_setOutputFile(fname)
+
+                # Input File
+                elif (arg <?> "i:").Result:
+                    let fname:string = arg.chomp("i:")
+                    vm_file_in = fname
+                    vm_file_out = C_setOutputFile(fname[0..<fname.len-2])
+
+                # Help Message
+                elif (arg <?> "-help").Result:
+                    displayHelpMessage()
+
+                # Clean Up
+                elif (arg <?> "-keep-intermidiate").Result:
+                    C_setCleanup(false)
+                else:
+                    echo "gravity: invalid option: " & $argv[i]
+                    displayHelpMessage()
+            else:
+                discard
+                    
+            case argv[0]
+            of "build":
+                vm_build = true
+            of "disassemble":
+                vm_debug = C_setDebug(true)
+            of "run":
+                vm_build = true
+                vm_run = true
+            else:
+                echo "gravity: invalid command: " & argv[0]
+                displayHelpMessage()
+                    
+    # Error Handling
+    if vm_file_in == "":
+        echo "\e[1mgravity: <\e[91mIO-Error\e[0m\e[1m>\e[0m"
+        echo "|> Compilation Stopped!"
+        echo "|> Reason: No input file specified"
+        quit()
+
+    try:
+        discard open(vm_file_in, fmRead)
+    except IOError as e:
+        echo "\e[1mgravity: <\e[91mIO-Error\e[0m\e[1m>\e[0m"
+        echo "|> Compilation Stopped!"
+        echo "|> Reason: Cannot open file '" & vm_file_in  & "'"
+        echo "|\e[90m--------\e[0m> File or directory does not exist"
+        #echo "\e[90m|> nim: " & e.msg & "\e[0m"
+        quit()
+        
+    # Hard set debug mode to false (if it was never set to true)
+    if not vm_debug:
+        discard C_setDebug(false,false)
