@@ -1,1 +1,0 @@
-02 [Hello, World\n] 00 00
