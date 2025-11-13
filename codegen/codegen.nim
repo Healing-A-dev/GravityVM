@@ -76,7 +76,9 @@ proc C_generateASM*(): void =
     defer: c_out.close()
 
     # Writing To File
-    c_out.writeLine("    .global _start\n\n") 
+    c_out.writeLine("    .file \"" & c_tmp & "\"")
+    c_out.writeLine("    .text")
+    c_out.writeLine("    .global _start\n") 
     if c_bss.len > 0:
         c_out.writeLine("    .section .bss")
         c_out.writeLine(c_bss.join(""))
@@ -89,17 +91,34 @@ proc C_generateASM*(): void =
     if c_rodata.len > 0:
         c_out.writeLine("    .section .rodata")
         c_out.writeLine(c_rodata.join(""))
-        
 
-proc C_compile*(): void =
+        
+proc C_compile*(): int =
     var files: seq[string] = @[c_tmp, c_output, c_output&".o"]
-    discard execCmd("as -o " & files[2] & " " & files[0])
-    discard execCmd("ld -o " & files[1] & " " & files[2])
+    var exit_code:int = 0
+    var status: string = " \e[96m[" & $exit_code & "]\e[0m"
+    
+    exit_code = execCmd("as -o " & files[2] & " " & files[0])
+    
+    if exit_code != 0:
+        status = " \e[91m[" & $exit_code & "]\e[0m"
+        
+    echo "\e[92mHint:\e[0m as -o " & files[2] & " " & files[0] & status
+
+    if exit_code == 0:
+        exit_code = execCmd("ld -o " & files[1] & " " & files[2])
+        if exit_code != 0:
+                status = " \e[91m[" & $exit_code & "]\e[0m"
+                
+        echo "\e[92mHint:\e[0m ld -o " & files[1] & " " & files[2] & status
 
     # cleanup
     if c_clean:
         files[1] = "" 
         discard execCmd("rm " & files.join(" "))
 
+    return exit_code
+
 proc C_run*(): void =
+    echo "\e[92mHint:\e[0m ./" & c_output & " \e[96m[Exec]\e[0m"
     discard execCmd("./" & c_output)

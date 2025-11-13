@@ -2,6 +2,7 @@ import ../codegen/codegen
 import pattern
 
 var vm_debug*: bool = C_setDebug(false)
+var vm_recompile*: bool = false
 var vm_file_out*: string = ""
 var vm_file_in*: string = ""
 var vm_build*: bool = false
@@ -29,6 +30,7 @@ proc displayHelpMessage(): void =
         "Options:",
         "  -o:[output_file]       Set the output file",
         "  -i:[input_file]        Set the input file",
+        "  --force                Force compilation, ignoring the current cache file",
         "  --help                 Display this message and exit",
         "  --keep-intermediate    Prevent clean-up after execution, keeping all intermediate files"
     ]
@@ -53,8 +55,14 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 # Input File
                 elif (arg <?> "i:").Result:
                     let fname:string = arg.chomp("i:")
+                    if (fname <?> ".").Result:
+                        let fname_out = fname[0..(fname <?> ".").Region[0] - 1]
+                        vm_file_out = C_setOutputFile(fname_out)
                     vm_file_in = fname
-                    vm_file_out = C_setOutputFile(fname[0..<fname.len-2])
+
+                # Force Recompile
+                elif (arg <?> "-force").Result:
+                    vm_recompile = true
 
                 # Help Message
                 elif (arg <?> "-help").Result:
@@ -63,6 +71,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 # Clean Up
                 elif (arg <?> "-keep-intermidiate").Result:
                     C_setCleanup(false)
+                    
                 else:
                     echo "gravity: invalid option: " & $argv[i]
                     displayHelpMessage()

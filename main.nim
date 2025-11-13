@@ -4,7 +4,7 @@ import std/tables
 import codegen/codegen
 import core/instructions
 import core/cli
-#import core/memory
+import core/cache
 
 # Instance Variables
 var str_buffer: seq[string] = @[]
@@ -46,9 +46,6 @@ proc generateInstructions(file: string): seq[string] =
                         instructions.add(instruction)
     return instructions
                         
-let pInstr: seq[string] = generateInstructions(vm_file_in)
-
-
 
 proc expectedLen(length: int): string = 
     var str: string = ""
@@ -61,6 +58,8 @@ proc expectedLen(length: int): string =
     return str
 
 
+let pInstr: seq[string] = generateInstructions(vm_file_in)
+
 if pInstr.len mod 4 != 0:
     echo "\e[1mgravity: <\e[91mFORMAT-Error\e[0m\e[1m>\e[0m"
     echo "|> Reason: Invalid bytecode length"
@@ -68,52 +67,55 @@ if pInstr.len mod 4 != 0:
     echo "|\e[90m--------\e[0m> Expected length: " & $(expectedLen(pInstr.len))
     quit()
 
+discard generateData(vm_file_in, pInstr)
+let recompile: int = compareCache(vm_file_in)
 
-while instruction_counter < pInstr.len-1:
-    var instruction: string = pInstr[instruction_counter]
-    if Instructions.hasKey(instruction) and instruction_counter == cmd:
-        var OPCODE: string = Instructions[instruction]
-        var OPARGS: seq[string] = @[]
-        var instruction_counter_next: int = instruction_counter
-
-        while OPARGS.len < 3:
-            OPARGS.add(pInstr[instruction_counter_next + 1])
-            instruction_counter_next.inc()
-
-        # Failed Instruction
-        if OP[OPCODE](OPARGS[0], OPARGS[1], OPARGS[2]) != 0:
+if recompile == 1 or vm_recompile:
+    while instruction_counter < pInstr.len-1:
+        var instruction: string = pInstr[instruction_counter]
+        if Instructions.hasKey(instruction) and instruction_counter == cmd:
+            var OPCODE: string = Instructions[instruction]
+            var OPARGS: seq[string] = @[]
+            var instruction_counter_next: int = instruction_counter
+    
+            while OPARGS.len < 3:
+                OPARGS.add(pInstr[instruction_counter_next + 1])
+                instruction_counter_next.inc()
+    
+            # Failed Instruction
+            if OP[OPCODE](OPARGS[0], OPARGS[1], OPARGS[2]) != 0:
+                echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
+                echo "|> Compilation Stopped!"
+                echo "|> Reason: " & OPERROR
+                echo "|\e[90m--------\e[0m> Intruction: " & instruction & ", " & OPCODE & ""
+                echo "|> Where:"
+                echo "|\e[90m-------\e[0m> File: " & vm_file_in
+                echo "|\e[90m-------\e[0m> Line: " & $((instruction_counter/4) + 1)
+                quit()
+    
+            cmd = cmd + 4
+        elif not Instructions.hasKey(instruction) and instruction_counter == cmd:
             echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
             echo "|> Compilation Stopped!"
-            echo "|> Reason: " & OPERROR
-            echo "|\e[90m--------\e[0m> Intruction: " & instruction & ", " & OPCODE & ""
+            echo "|> Reason: Invalid instruction '" & instruction & "'"
             echo "|> Where:"
             echo "|\e[90m-------\e[0m> File: " & vm_file_in
             echo "|\e[90m-------\e[0m> Line: " & $((instruction_counter/4) + 1)
             quit()
-
-        cmd = cmd + 4
-    elif not Instructions.hasKey(instruction) and instruction_counter == cmd:
-        echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
-        echo "|> Compilation Stopped!"
-        echo "|> Reason: Invalid instruction '" & instruction & "'"
-        echo "|> Where:"
-        echo "|\e[90m-------\e[0m> File: " & vm_file_in
-        echo "|\e[90m-------\e[0m> Line: " & $((instruction_counter/4) + 1)
-        break
-
-    instruction_counter.inc()
+    
+        instruction_counter.inc()
 
 
-let args: seq[string] = commandLineParams()
-for param in args:
-    if param == "-w:on":
-        warn = true
-
-if OPWARN != "Warning(s):\n" and warn:
-    echo OPWARN
+    if OPWARN != "Warning(s):\n" and warn:
+        echo OPWARN
 
 if not vm_debug and vm_build:
-    C_generateASM()
-    C_compile()
-    if vm_run:
-        C_run()
+    if recompile == 0 and not vm_recompile:
+        if vm_run:
+            C_run()
+    else:
+        C_generateASM()
+        let status: int = C_compile()
+        let write_status: int = writeCache(vm_file_in)
+        if vm_run and status == 0:
+            C_run()

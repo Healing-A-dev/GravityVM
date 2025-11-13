@@ -1,6 +1,6 @@
 import tables
 
-# Memory Pools #
+# Virtual Memory Pools #
 var POOL_LOCAL*: ref Table[string, string]  = new(Table[string, string])
 var POOL_GLOBAL*: ref Table[string, string] = new(Table[string, string])
 var POOL_BUFFER*: ref Table[string, string] = new(Table[string, string])

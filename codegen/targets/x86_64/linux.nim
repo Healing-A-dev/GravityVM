@@ -29,7 +29,6 @@ proc add_or_increment(var_name: string): int =
         variable_loop_counter[var_name] = 0
     else:
         variable_loop_counter[var_name].inc()
-
     return variable_loop_counter[var_name]
 
 
@@ -175,6 +174,9 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
         return ""
 
     try:
+        if d2[0] == '[' and d2[d2.len - 1] == ']':
+            d2 = d2[1..<(d2.len - 1)]
+            
         # Integers
         discard parseInt(d2)
         needIntBuffer = true

@@ -84,17 +84,15 @@ OP["READ"] = proc(memory_address: var string, arg0: var string = "", arg1: var s
 OP["WRITE"] = proc(memory_address: var string, arg0: var string = "", arg1: var string = ""): int =
     # Instance Variables #
     var data: string = ""
-
-    if memory_address[0] == '@':
-        # memory_address = memory_address.replace("@","")
+    case memory_address[0]
+    of '@':
         if POOL_GLOBAL.hasKey("" & memory_address[1..<memory_address.len]):
             data = POOL_GLOBAL[memory_address[1..<memory_address.len]]
         else:
             OPERROR = "Invalid [Global] Memory Address: '" & memory_address[1..<memory_address.len] & "'"
             return 1
 
-    elif memory_address[0] == '[':
-        # memory_address = memory_address[1..<(memory_address.len - 1)]
+    of '[':
         data = memory_address[1..<(memory_address.len - 1)]
         if REGISTER.hasKey(memory_address[1..<(memory_address.len - 1)]) and REGISTER[memory_address[1..<(memory_address.len - 1)]] != "":
             data = REGISTER[memory_address[1..<(memory_address.len - 1)]]
@@ -103,16 +101,14 @@ OP["WRITE"] = proc(memory_address: var string, arg0: var string = "", arg1: var 
         if data[0] == '[':
             data = data[1..<(data.len - 1)]
 
-    elif memory_address[0] == '$':
-        # memory_address = memory_address[1..<memory_address.len]
+    of '$':
         if POOL_LOCAL.hasKey(memory_address[1..<memory_address.len]):
             data = POOL_LOCAL[memory_address[1..<memory_address.len]]
         else:
             OPERROR = "Invalid [Local] Memory Address: '" & memory_address[1..<memory_address.len] & "'"
             return 1
 
-    elif memory_address[0] == '%':
-            # memory_address = memory_address[1..<memory_address.len]
+    of '%':
             if POOL_BUFFER.hasKey(memory_address[1..<memory_address.len]):
                 data = POOL_BUFFER[memory_address[1..<memory_address.len]]
             else:
