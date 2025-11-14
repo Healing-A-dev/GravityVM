@@ -70,7 +70,7 @@ if pInstr.len mod 4 != 0:
 discard generateData(vm_file_in, pInstr)
 let recompile: int = compareCache(vm_file_in)
 
-if recompile == 1 or vm_recompile:
+if recompile == 1 or vm_recompile or vm_debug:
     while instruction_counter < pInstr.len-1:
         var instruction: string = pInstr[instruction_counter]
         if Instructions.hasKey(instruction) and instruction_counter == cmd:

@@ -58,7 +58,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     if (fname <?> ".").Result:
                         let fname_out = fname[0..(fname <?> ".").Region[0] - 1]
                         vm_file_out = C_setOutputFile(fname_out)
-                    vm_file_in = fname
+                    vm_file_in = C_setInputFile(fname)
 
                 # Force Recompile
                 elif (arg <?> "-force").Result:
@@ -71,6 +71,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 # Clean Up
                 elif (arg <?> "-keep-intermidiate").Result:
                     C_setCleanup(false)
+                    vm_recompile = true
                     
                 else:
                     echo "gravity: invalid option: " & $argv[i]

@@ -42,6 +42,9 @@ proc C_setOutputFile*(file: string): string =
     c_output = file
     return file
 
+proc C_setInputFile*(file: string): string =
+    c_input = file
+    return file
 
 proc C_setCleanup*(state: bool = true): void =
     c_clean = state
@@ -76,7 +79,7 @@ proc C_generateASM*(): void =
     defer: c_out.close()
 
     # Writing To File
-    c_out.writeLine("    .file \"" & c_tmp & "\"")
+    c_out.writeLine("    .file \"" & c_input & "\"")
     c_out.writeLine("    .text")
     c_out.writeLine("    .global _start\n") 
     if c_bss.len > 0:

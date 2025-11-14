@@ -53,25 +53,24 @@ proc generateHash(str: seq[string]): string =
 
 proc generateData*(fname: string, instructions: seq[string]): int =
     let instruction_counter: string = $(instructions.len / 4)
-    cacheData.add("<Project>")
-    cacheData.add("    <Name> " & vm_file_out & " </Name>")
-    cacheData.add("    <File> \"" & fname & "\" </File> ")
-    cacheData.add("    <Verif> " & generateHash(instructions) & " </Verif>")
-    cacheData.add("    <ProjectData>")
-    cacheData.add("        <Instructions> " & instruction_counter[0..<instruction_counter.len-2] & " </Instructions>")
-    cacheData.add("        <Program> " & instructions.join("") & " </Program>")
-    cacheData.add("    </ProjectData>")
-    cacheData.add("    <CompilerVersion> \"0.1 Neutron\" </CompilerVersion>")
-    cacheData.add("</Project>")
+    cacheData.add("(Start: Project")
+    cacheData.add("    (Definition: Name => " & vm_file_out & ")")
+    cacheData.add("    (Definition: File => \"" & fname & "\")")
+    cacheData.add("    (Definition: Identifier => " & generateHash(instructions) & ")")
+    cacheData.add("    (Definition: ProjectData => (")
+    cacheData.add("        (Definition: Instructions => " & instruction_counter[0..<instruction_counter.len-2] & ")")
+    cacheData.add("        (Definition: Program => " & instructions.join("") & ")")
+    cacheData.add("    ))")
+    cacheData.add("    (Definition: CompilerVersion => \"0.1 Neutron\")")
+    cacheData.add("End: Project)")
     return 0
     
 
 proc writeCache*(file_path: string): int =
-    let file_location: int = (file_path <?> stripDir(file_path)).Region[0]
-    var directory: string = file_path[0..(file_location - 1)]
-
+    let file_location: tuple = (file_path <?> stripDir(file_path))
+    var directory: string = file_path[0..(file_location.Region[0] - 1)]
     try:
-        let file: File = open("./" & directory & ".g_cache/script.xml", fmWrite) 
+        let file: File = open("./" & directory & ".g_cache/" & file_location.Pattern & ".script", fmWrite) 
         for item in cacheData:
             file.writeLine(item)
         file.close()
@@ -79,7 +78,7 @@ proc writeCache*(file_path: string): int =
         let status: int = execCmd("mkdir " & directory & ".g_cache/")
         if status != 0:
             return status
-        let file: File = open("./" & directory & ".g_cache/script.xml", fmWrite)
+        let file: File = open("./" & directory & ".g_cache/" & file_location.Pattern & ".script", fmWrite)
         for item in cacheData:
             file.writeLine(item)
         file.close()
@@ -88,22 +87,22 @@ proc writeCache*(file_path: string): int =
 
 
 proc compareCache*(file_path: string): int =
-    let file_location: int = (file_path <?> stripDir(file_path)).Region[0]
-    var directory: string = file_path[0..(file_location - 1)]   
-
+    let file_location: tuple = (file_path <?> stripDir(file_path))
+    var directory: string = file_path[0..(file_location.Region[0] - 1)]   
     try:
-        let cache: seq[string] = readFile("./" & directory & ".g_cache/script.xml").splitLines()
+        let cache: seq[string] = readFile("./" & directory & ".g_cache/" & file_location.Pattern & ".script").splitLines()
         var out_file: string = ""
         for position, item in cache.pairs():
             if position < cacheData.len and cacheData[position] != item:
                 return 1
-            elif position < cacheData.len and cacheData[position].contains("<Name>"):
+            elif position < cacheData.len and cacheData[position].contains("(Definition: Name =>"):
                 out_file = (cacheData[position] <?> vm_file_out).Pattern
+                
         if fileExists(out_file):
             return 0
         else:
             return 1
 
-    # No Cache File => Skip Comparison
+    # No Cache File
     except IOError:
-        return 0
+        return 1
