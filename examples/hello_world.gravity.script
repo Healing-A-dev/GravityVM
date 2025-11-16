@@ -1,0 +1,10 @@
+(Start: Project
+    (Definition: Name => examples/hello_world)
+    (Definition: File => "examples/hello_world.gravity")
+    (Definition: Identifier => 12818,q()
+    (Class: ProjectData => (
+        (Definition: Instructions => 8)
+        (Definition: Program => 0H@0010003@01[This was written in gravity :>\n]000G@01[Testing]0002[Hello, World\n]000002[This was compiled using the GravityVM\n]000002[\n]000002@0100000I@000000)
+    ))
+    (Definition: CompilerVersion => "0.1 Neutron")
+End: Project)
