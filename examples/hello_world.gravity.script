@@ -1,3 +1,6 @@
+# Example of a cache file that is generated when building/running a gravity file
+# All Cache files are stored in a .g_cache folder in the directory that the input file was located in (ie. this file would be located in examples/.g_cache)
+
 (Start: Project
     (Definition: Name => examples/hello_world)
     (Definition: File => "examples/hello_world.gravity")
