@@ -1,3 +1,5 @@
+# Native executable compiled from gravity
+# Gravity will ALWAYS attempt to compile first then transpile (unless forced to otherwise)
     .file "examples/hello_world.gravity"
     .text
     .global _start
