@@ -1,8 +1,8 @@
 							  Orb[it]-VM Reference Manual
 
 | About:
-| 	Orb[it]-VM (also called O-VM) is a small, lightweight virtual machine that operates on a custom bytecode format.
-|	O-VM is a memory/register based VM with addresses ranging from "01" -> "zz".
+| 	GravityVM (also called GVM) is a small, lightweight virtual machine that operates on a custom bytecode format.
+|	GVM is a memory/register based VM with addresses ranging from "01" -> "zz".
 |	The format (a 4 block structure) is as follows: INSTRUCTION ARG0, ARG1, ARG2.
 
 |	Each bytecode is only two characters long (ie. "00") with a few exexceptions.

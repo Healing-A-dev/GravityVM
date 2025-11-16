@@ -1156,5 +1156,6 @@ OP["UPD"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     #echo getType(POOL_0[][memory_address]).Type
     #echo POOL_0[][memory_address]
 
+    # echo "UPDATE " & arg0
         
     return 0

@@ -24,15 +24,15 @@ proc displayHelpMessage(): void =
     const message_head: string = "Usage: gravity <command> <options?>"
     const message_body: seq[string] = @[
         "Commands:",
-        "  disassemble            Disassembles the given bytecode file and displays each intruction",
+        "  disassemble            Disassembles the given file and displays each intruction",
         "  build                  Compile the given bytecode file",
         "  run                    Compile and run the given bytecode file",
         "Options:",
-        "  -o:[output_file]       Set the output file",
-        "  -i:[input_file]        Set the input file",
-        "  --force                Force compilation, ignoring the current cache file",
-        "  --help                 Display this message and exit",
-        "  --keep-intermediate    Prevent clean-up after execution, keeping all intermediate files"
+        "  --help                  Display this message and exit",
+        "  -i:[input_file]         Set the input file",
+        "  -o:[output_file]        Set the output file <Optional>",
+        "  -f:[complie|transpile]  Force compilation, ignoring the current cache file | Force transpilation instead of automatic compilation/transpilation",
+        "  -intermediates:[true|false (default)]  Prevent clean-up after execution, keeping all intermediate files",
     ]
     echo message_head & "\n" & message_body.join("\n")
     quit()
@@ -61,17 +61,26 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     vm_file_in = C_setInputFile(fname)
 
                 # Force Recompile
-                elif (arg <?> "-force").Result:
-                    vm_recompile = true
+                elif (arg <?> "f:compile").Result:
+                    vm_recompile = C_setState("recompile", true)
+
+                # Force Transpile
+                elif (arg <?> "f:transpile").Result:
+                    vm_recompile = C_setState("recompile", true)
+                    C_setTranspile(true)
 
                 # Help Message
                 elif (arg <?> "-help").Result:
                     displayHelpMessage()
 
                 # Clean Up
-                elif (arg <?> "-keep-intermidiate").Result:
-                    C_setCleanup(false)
-                    vm_recompile = true
+                elif (arg <?> "intermidiates:true").Result:
+                    C_setState("cleanup", false)
+                    vm_recompile = C_setState("recompile", true)
+
+                elif (arg <?> "intermidiates:false").Result:
+                    C_setState("cleanup", true)
+                    vm_recompile = C_setState("recompile", true)
                     
                 else:
                     echo "gravity: invalid option: " & $argv[i]
@@ -81,12 +90,12 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     
             case argv[0]
             of "build":
-                vm_build = true
+                vm_build = C_setState("build", true)
             of "disassemble":
                 vm_debug = C_setDebug(true)
             of "run":
-                vm_build = true
-                vm_run = true
+                vm_build = C_setState("build", true)
+                vm_run = C_setState("run", true)
             else:
                 echo "gravity: invalid command: " & argv[0]
                 displayHelpMessage()

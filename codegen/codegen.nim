@@ -1,23 +1,38 @@
 # Static modules
-import targets/target
 import tables
 import strutils
 import osproc
+import targets/target
 
 # Instance Variables
 var c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] = vm_getTarget()
+
 var c_rodata: seq[string] = @[]
 var c_text: seq[string] = @[]
 var c_data: seq[string] = @[]
 var c_void: seq[string] = @[]
 var c_bss: seq[string] = @[]
+
+var c_debug: bool = true
 var c_clean: bool = true
 var c_input: string = ""
-var c_output: string = ""
-const c_tmp: string = "out.s"
+var c_output*: string = ""
+
+var c_recompile: bool = false
+var c_transpile: bool = false
+var c_build: bool = false
+var c_run: bool = false
+
+var c_tmp: string = "out"
 
 
 proc C*(location: string, CMD: string, d0: string, d1: string, d2: string): int {.discardable.} =
+    if not c_cmds.hasKey(CMD):
+        echo "INVALID OPCODE: " & CMD
+        echo "Target: " & vm_target[]
+        echo "Arch: " & vm_architecture[]
+        quit()
+        
     case location
     of "TEXT":
         c_text.add(c_cmds[CMD](d0, d1, d2))
@@ -31,13 +46,7 @@ proc C*(location: string, CMD: string, d0: string, d1: string, d2: string): int 
     return 0
 
 
-proc C_setDebug*(state: bool, init: bool = true): bool =
-    if not state and not init:
-        c_cmds["__comment"] = proc(d0: string, d1: string, d2: string): string =
-            return ""
-    return state
-
-
+# VM Accessors #
 proc C_setOutputFile*(file: string): string =
     c_output = file
     return file
@@ -45,10 +54,33 @@ proc C_setOutputFile*(file: string): string =
 proc C_setInputFile*(file: string): string =
     c_input = file
     return file
-
-proc C_setCleanup*(state: bool = true): void =
-    c_clean = state
     
+proc C_setTranspile*(state: bool = false): void =
+    c_cmds = vm_getTarget("transpiler", "transpiler")
+    c_transpile = true
+
+proc C_setDebug*(state: bool, init: bool = true): bool =
+    if not state and not init:
+        c_debug = state
+        c_cmds["__comment"] = proc(d0: string, d1: string, d2: string): string =
+            return ""
+    return state
+
+proc C_setState*(c_type: string, state: bool = false): bool {.discardable.} = 
+    case c_type
+    of "build":
+        c_build = state
+    of "run":
+        c_run = state
+    of "recompile":
+        c_recompile = state
+    of "cleanup":
+        c_clean = state
+    else:
+        echo "INVALID COMPILER VARIABLE: " & c_type
+        quit()
+    return state
+
 
 
 proc C_generateASM*(): void =
@@ -74,7 +106,8 @@ proc C_generateASM*(): void =
         c_rodata.add("    .ascii \".\"\n")
         c_rodata.add("G_GB10:\n")
         c_rodata.add("    .double 10.0\n")
-    
+
+    c_tmp = c_tmp & ".s"
     let c_out = open(c_tmp, fmWrite)
     defer: c_out.close()
 
@@ -102,26 +135,58 @@ proc C_compile*(): int =
     var status: string = " \e[96m[" & $exit_code & "]\e[0m"
     
     exit_code = execCmd("as -o " & files[2] & " " & files[0])
-    
     if exit_code != 0:
-        status = " \e[91m[" & $exit_code & "]\e[0m"
-        
+        status = " \e[91m[" & $exit_code & "]\e[0m" 
     echo "\e[92mHint:\e[0m as -o " & files[2] & " " & files[0] & status
 
     if exit_code == 0:
         exit_code = execCmd("ld -o " & files[1] & " " & files[2])
         if exit_code != 0:
-                status = " \e[91m[" & $exit_code & "]\e[0m"
-                
+                status = " \e[91m[" & $exit_code & "]\e[0m"       
         echo "\e[92mHint:\e[0m ld -o " & files[1] & " " & files[2] & status
 
-    # cleanup
     if c_clean:
         files[1] = "" 
         discard execCmd("rm " & files.join(" "))
 
     return exit_code
 
+
+
+proc C_generatePERL*(): void =
+    c_tmp = c_output
+    let c_out: File = open(c_tmp, fmWrite)
+    defer: c_out.close()
+    c_out.writeLine("sub main() {")
+    if c_data.len > 0:
+        c_out.writeLine(c_data.join(""))
+    c_out.writeLine(c_text.join(""))
+    c_out.writeLine("}\n&main()")
+
+
+
 proc C_run*(): void =
+    if vm_target[] == "transpiler":
+        echo "\e[92mHint:\e[0m perl " & c_output & " \e[96m[Exec]\e[0m"
+        discard execCmd("perl " & c_output)
+        return
+
     echo "\e[92mHint:\e[0m ./" & c_output & " \e[96m[Exec]\e[0m"
     discard execCmd("./" & c_output)
+
+
+proc C_buildProgram*(instructions: seq[string], recompile: int = 1): tuple[ERRCODE: int, Run: bool] =
+    if c_transpile:
+        if not c_debug and c_build:
+            C_generatePERL()
+            if c_run:
+                C_run()
+    else:
+        if not c_debug and c_build:
+            if recompile == 0 and not c_recompile:
+                if c_run:
+                    C_run()
+            else:
+                C_generateASM()
+                let status: int = C_compile()
+                return (ERRCODE: status, Run: c_run)

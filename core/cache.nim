@@ -24,7 +24,16 @@ proc stripDir(file_path: string ): string =
         s.dec()
 
     return tmp.join()
-    
+
+
+proc indexCache(directory: string): tuple[Count: int, Files: seq[string]] = 
+    var files: seq[string] = @[]
+    for kind, name in  walkDir(directory):
+        var kind: string = $kind
+        if kind == "pcFile":
+            files.add(name)
+    return (Count: files.len, Files: files)
+            
 
 proc generateHash(str: seq[string]): string =
     var total: int = 0 
@@ -51,13 +60,13 @@ proc generateHash(str: seq[string]): string =
     return $total & hash
 
 
-proc generateData*(fname: string, instructions: seq[string]): int =
+proc generateData*(fname: string, instructions: seq[string]): int {.discardable.} =
     let instruction_counter: string = $(instructions.len / 4)
     cacheData.add("(Start: Project")
     cacheData.add("    (Definition: Name => " & vm_file_out & ")")
     cacheData.add("    (Definition: File => \"" & fname & "\")")
     cacheData.add("    (Definition: Identifier => " & generateHash(instructions) & ")")
-    cacheData.add("    (Definition: ProjectData => (")
+    cacheData.add("    (Class: ProjectData => (")
     cacheData.add("        (Definition: Instructions => " & instruction_counter[0..<instruction_counter.len-2] & ")")
     cacheData.add("        (Definition: Program => " & instructions.join("") & ")")
     cacheData.add("    ))")
@@ -66,9 +75,15 @@ proc generateData*(fname: string, instructions: seq[string]): int =
     return 0
     
 
-proc writeCache*(file_path: string): int =
+proc writeCache*(file_path: string): int {.discardable.} =
     let file_location: tuple = (file_path <?> stripDir(file_path))
     var directory: string = file_path[0..(file_location.Region[0] - 1)]
+    let cache_index: tuple = indexCache(directory & ".g_cache")
+    
+    if cache_index.Count + 1 == 6:
+        for file in cache_index.Files:
+            removeFile(file)
+        
     try:
         let file: File = open("./" & directory & ".g_cache/" & file_location.Pattern & ".script", fmWrite) 
         for item in cacheData:
