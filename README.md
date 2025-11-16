@@ -1,4 +1,7 @@
-# GravityVM Reference Manual
+# GravityVM
+------
+> [!WARNING]
+> GravityVM is VERY work in progress, and I have a lot more to get done with it as well!
 -------
 ### About:
 GravityVM is a small, lightweight, memory/register based virtual machine that operates on a custom bytecode format.
