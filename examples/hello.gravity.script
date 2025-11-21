@@ -1,0 +1,10 @@
+(Start: Project
+    (Definition: Name => examples/hello)
+    (Definition: File => "examples/hello.gravity")
+    (Definition: Identifier => 6139]G)
+    (Class: ProjectData => (
+        (Definition: Instructions => 8)
+        (Definition: Program => 0H$0010002[Enter your name: ]000001$01000002[Hello ]000002$01000002[!]000002[srnl]00000I$000000)
+    ))
+    (Definition: CompilerVersion => "0.1 Neutron")
+End: Project)
