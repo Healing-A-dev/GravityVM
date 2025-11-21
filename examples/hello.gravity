@@ -1,10 +1,8 @@
-0H @00 1 00
-03 @01 [This was written in gravity :>\n] 00
-
-02 [Hello, World\n]  00 00
-02 [This was compiled using the GravityVM\n] 00 00
-02 @01 00 00
-
-0G @01 [Testing\n] 00
-02 @01 00 00
-0I @00 00 00
+0H $00 1 00
+02 [Enter your name: ] 00 00
+01 $01 00 00
+02 [Hello ] 00 00
+02 $01 00 00
+02 [!] 00 00
+02 [srnl] 00 00
+0I $00 00 00
