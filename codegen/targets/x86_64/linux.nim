@@ -10,7 +10,7 @@ var variables*: Table[string, string] = initTable[string, string]()
 var needIntBuffer: bool = false
 var needStrBuffer: bool = false
 var needDotGlobal: bool = true
-var variable_loop_counter: Table[string, int] = initTable[string, int]() 
+var variable_loop_counter: Table[string, int] = initTable[string, int]()
 var write_storage: Table[string, string] = initTable[string, string]()
 
 
@@ -32,9 +32,9 @@ proc add_or_increment(var_name: string): int =
     return variable_loop_counter[var_name]
 
 
-# Compiler Functions #       
+# Compiler Functions #
 x86_64_linux["__required"] = proc(d0: string, d1: string, d2: string): string =
-    return "int: " & $needIntBuffer & "\nstr: " & $needStrBuffer & "\ndot: " & $needDotGlobal 
+    return "int: " & $needIntBuffer & "\nstr: " & $needStrBuffer & "\ndot: " & $needDotGlobal
 
 
 x86_64_linux["__makeTemp"] = proc(d0: string, d1: string, d2: string): string =
@@ -71,7 +71,7 @@ x86_64_linux["STORE"] = proc(d0: string, d1: string, d2:string): string =
         echo "Working on it"
     else:
         return ""
-        
+
     try:
         # Integers
         discard parseInt(d1)
@@ -93,10 +93,10 @@ x86_64_linux["STORE"] = proc(d0: string, d1: string, d2:string): string =
                 # to_append.append("    .ascii " & d1)
             else:
                 to_append.append("    .ascii \"" & d1 & "\"")
-            
+
             to_append.append("    .byte 0")
             variables[d0] = "string"
-        
+
     return to_append
 
 
@@ -130,7 +130,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
                         write_storage[variable_name] = variable_name & ":\n    .double " & REGISTER[d3]
                     except:
                         # Strings
-                        write_storage[variable_name] = variable_name & ":\n    .ascii \"" & REGISTER[d3] & "\"\n    .byte 0" 
+                        write_storage[variable_name] = variable_name & ":\n    .ascii \"" & REGISTER[d3] & "\"\n    .byte 0"
                 d2 = REGISTER[d3]
                 d0 = variable_name
             else:
@@ -147,7 +147,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
                         write_storage[variable_name] = variable_name & ":\n    .double " & d3
                     except:
                         # Strings
-                        write_storage[variable_name] = variable_name & ":\n    .ascii \"" & d3 & "\"\n    .byte 0" 
+                        write_storage[variable_name] = variable_name & ":\n    .ascii \"" & d3 & "\"\n    .byte 0"
                 d2 = d3
                 d0 = variable_name
                 d1 = $d3.len
@@ -165,10 +165,10 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
                     write_storage[variable_name] = variable_name & ":\n    .double " & d3
                 except:
                     # Strings
-                    write_storage[variable_name] = variable_name & ":\n    .ascii \"" & d3 & "\"\n    .byte 0" 
+                    write_storage[variable_name] = variable_name & ":\n    .ascii \"" & d3 & "\"\n    .byte 0"
             d2 = d3
             d0 = variable_name
-            d1 = $d3.len 
+            d1 = $d3.len
     else:
         echo "WIP"
         return ""
@@ -176,13 +176,13 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
     try:
         if d2[0] == '[' and d2[d2.len - 1] == ']':
             d2 = d2[1..<(d2.len - 1)]
-            
+
         # Integers
         discard parseInt(d2)
         needIntBuffer = true
         let loop_count: int = add_or_increment(d0)
         let iteration: string = "_" & $loop_count
-        
+
         to_append.append("    mov " & d0 & "(%rip), %rax")
         to_append.append("    mov $10, %rcx")
         to_append.append("    lea B_GIB + 32(%rip), %rsi")
@@ -204,7 +204,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
         try:
             if d2[0] == '[' and d2[d2.len - 1] == ']':
                 d2 = d2[1..<(d2.len - 1)]
-                
+
             # Floats
             discard parseFloat(d2)
             needStrBuffer = true
@@ -212,7 +212,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
             let size_d:int = d2[d2.find(".") + 1..<d2.len].len
             let loop_count: int = add_or_increment(d0)
             let iteration: string = "_" & $loop_count
-            
+
             to_append.append("    movsd " & d0 & "(%rip), %xmm0")
             to_append.append("    cvttsd2si %xmm0, %rax")
             to_append.append("    mov %rax, %rbx")
@@ -268,7 +268,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
             to_append.append("    mov $" & d1 & ", %rdx")
             to_append.append("    syscall")
             to_append.append("")
-    
+
     return to_append
 
 
@@ -279,17 +279,17 @@ x86_64_linux["COPY"] = proc(d0: string, d1: string, d2: string): string =
     echo d1
     echo d2
 
-    
+
     return to_append
 
 
 x86_64_linux["STORE REGISTER"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    
+
     echo d0
     echo d1
     echo d2
-    
+
     return to_append
 
 
@@ -361,30 +361,30 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
                 typing1 = "number"
             except:
                 typing1 = "string"
-                needStrBuffer = true   
+                needStrBuffer = true
 
     if typing1 == typing0:
         case typing0:
         of "string":
             if not needStrBuffer:
-                to_append.append("    mov $" & d1 & ", %rsi")  
+                to_append.append("    mov $" & d1 & ", %rsi")
                 to_append.append("    mov $" & d0 & " + 0, %rdi")
-                to_append.append("    mov $" & $(POOL_1[][d1].len) & ", %rcx")   
+                to_append.append("    mov $" & $(POOL_1[][d1].len) & ", %rcx")
                 to_append.append("    cld")
                 to_append.append("    resp movsb")
             else:
                 echo "TODO: IMPLEMENT STR BUFFER STRING UPDATES"
-                quit()
+                #quit()
         of "number":
             var number: float = parseFloat(d1)
             var to_match: float = 0
-            
+
             if POOL_1[].hasKey(d1):
                 number = parseFloat(POOL_1[d1])
-                
+
             to_append.append("    mov $" & $number & ", $[" & d0 & "]")
     else:
         echo "TODO: IMPLEMENT: " & typing0 & " -> " & typing1 & "UPDATES"
         quit()
-        
+
     return to_append

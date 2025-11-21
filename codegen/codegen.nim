@@ -3,27 +3,48 @@ import tables
 import strutils
 import osproc
 import targets/target
+import targets/transpiler/packaging
+import ../core/pattern
 
 # Instance Variables
-var c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] = vm_getTarget()
+var
+    c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] = vm_getTarget()
+    c_rodata: seq[string] = @[]
+    c_text: seq[string] = @[]
+    c_data: seq[string] = @[]
+    c_void: seq[string] = @[]
+    c_bss: seq[string] = @[]
+    c_debug: bool = true
+    c_clean: bool = true
+    c_input: string = ""
+    c_output*: string = ""
+    c_recompile: bool = false
+    c_transpile: bool = false
+    c_build: bool = false
+    c_run: bool = false
+    c_tmp: string = "out"
 
-var c_rodata: seq[string] = @[]
-var c_text: seq[string] = @[]
-var c_data: seq[string] = @[]
-var c_void: seq[string] = @[]
-var c_bss: seq[string] = @[]
 
-var c_debug: bool = true
-var c_clean: bool = true
-var c_input: string = ""
-var c_output*: string = ""
 
-var c_recompile: bool = false
-var c_transpile: bool = false
-var c_build: bool = false
-var c_run: bool = false
+# Directory Stripper
+proc stripDir(file_path: string): string =
+    var directory: seq[char] = @[]
+    var tmp: seq[char] = @[]
 
-var c_tmp: string = "out"
+    if not c_output.contains("/"):
+        return file_path
+
+    directory.add(file_path[file_path.len - 1])
+    while directory[directory.len - 1] != '/':
+        directory.add(file_path[file_path.len - 1 - (directory.len - 1)])
+
+    var s: int = directory.len - 2
+    while s > 0:
+        tmp.add(directory[s])
+        s.dec()
+
+    return tmp.join("")
+
 
 
 proc C*(location: string, CMD: string, d0: string, d1: string, d2: string): int {.discardable.} =
@@ -32,7 +53,7 @@ proc C*(location: string, CMD: string, d0: string, d1: string, d2: string): int 
         echo "Target: " & vm_target[]
         echo "Arch: " & vm_architecture[]
         quit()
-        
+
     case location
     of "TEXT":
         c_text.add(c_cmds[CMD](d0, d1, d2))
@@ -54,7 +75,7 @@ proc C_setOutputFile*(file: string): string =
 proc C_setInputFile*(file: string): string =
     c_input = file
     return file
-    
+
 proc C_setTranspile*(state: bool = false): void =
     c_cmds = vm_getTarget("transpiler", "transpiler")
     c_transpile = true
@@ -66,7 +87,7 @@ proc C_setDebug*(state: bool, init: bool = true): bool =
             return ""
     return state
 
-proc C_setState*(c_type: string, state: bool = false): bool {.discardable.} = 
+proc C_setState*(c_type: string, state: bool = false): bool {.discardable.} =
     case c_type
     of "build":
         c_build = state
@@ -86,7 +107,7 @@ proc C_setState*(c_type: string, state: bool = false): bool {.discardable.} =
 proc C_generateASM*(): void =
     # Adding to Buffer
     c_rodata.add(c_cmds["__makeTemp"]("","",""))
-    
+
 
     # Temporary EXIT (to avoid address boundary error)
     c_text.add("    mov $60, %rax\n")
@@ -114,7 +135,7 @@ proc C_generateASM*(): void =
     # Writing To File
     c_out.writeLine("    .file \"" & c_input & "\"")
     c_out.writeLine("    .text")
-    c_out.writeLine("    .global _start\n") 
+    c_out.writeLine("    .global _start\n")
     if c_bss.len > 0:
         c_out.writeLine("    .section .bss")
         c_out.writeLine(c_bss.join(""))
@@ -128,47 +149,73 @@ proc C_generateASM*(): void =
         c_out.writeLine("    .section .rodata")
         c_out.writeLine(c_rodata.join(""))
 
-        
+
 proc C_compile*(): int =
     var files: seq[string] = @[c_tmp, c_output, c_output&".o"]
     var exit_code:int = 0
     var status: string = " \e[96m[" & $exit_code & "]\e[0m"
-    
+
     exit_code = execCmd("as -o " & files[2] & " " & files[0])
     if exit_code != 0:
-        status = " \e[91m[" & $exit_code & "]\e[0m" 
+        status = " \e[91m[" & $exit_code & "]\e[0m"
     echo "\e[92mHint:\e[0m as -o " & files[2] & " " & files[0] & status
 
     if exit_code == 0:
         exit_code = execCmd("ld -o " & files[1] & " " & files[2])
         if exit_code != 0:
-                status = " \e[91m[" & $exit_code & "]\e[0m"       
+                status = " \e[91m[" & $exit_code & "]\e[0m"
         echo "\e[92mHint:\e[0m ld -o " & files[1] & " " & files[2] & status
 
     if c_clean:
-        files[1] = "" 
+        files[1] = ""
         discard execCmd("rm " & files.join(" "))
 
     return exit_code
 
 
-
 proc C_generatePERL*(): void =
-    c_tmp = c_output
+    if c_output[c_output.len-3..c_output.len-1] != ".pl":
+        c_tmp = c_output & ".pl"
+    else:
+        c_tmp = c_output
+
     let c_out: File = open(c_tmp, fmWrite)
     defer: c_out.close()
-    c_out.writeLine("sub main() {")
+
+    # Create package folder to hold needed perl modules in
+    let perl_path: tuple = (c_output <?> stripDir(c_output))
+    let perl_directory: string = c_output[0..(perl_path.Region[0] - 1)]
+
+    try:
+        let inner: File = open(perl_directory & "__packaging__/innershell.pm", fmWrite)
+        inner.writeLine(innershell)
+        inner.close()
+        let outer: File = open(perl_directory & "__packaging__/outershell.pm", fmWrite)
+        outer.writeLine(outershell)
+        outer.close()
+    except IOError:
+        let status: int = execCmd("mkdir -p " & perl_directory & "__packaging__/")
+        let inner: File = open(perl_directory & "__packaging__/innershell.pm", fmWrite)
+        inner.writeLine(innershell)
+        inner.close()
+        let outer: File = open(perl_directory & "__packaging__/outershell.pm", fmWrite)
+        outer.writeLine(outershell)
+        outer.close()
+
+    c_out.writeLine("require \"./__packaging__/innershell.pm\";")
+    c_out.writeLine("require \"./__packaging__/outershell.pm\";")
+    c_out.writeLine("sub main {")
     if c_data.len > 0:
         c_out.writeLine(c_data.join(""))
     c_out.writeLine(c_text.join(""))
-    c_out.writeLine("}\n&main()")
+    c_out.writeLine("}\n&main();")
 
 
 
 proc C_run*(): void =
     if vm_target[] == "transpiler":
-        echo "\e[92mHint:\e[0m perl " & c_output & " \e[96m[Exec]\e[0m"
-        discard execCmd("perl " & c_output)
+        echo "\e[92mHint:\e[0m perl " & c_tmp & " \e[96m[Exec]\e[0m"
+        discard execCmd("perl " & c_tmp)
         return
 
     echo "\e[92mHint:\e[0m ./" & c_output & " \e[96m[Exec]\e[0m"

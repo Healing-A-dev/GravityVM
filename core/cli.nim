@@ -61,11 +61,11 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     vm_file_in = C_setInputFile(fname)
 
                 # Force Recompile
-                elif (arg <?> "f:compile").Result:
+                elif (arg == "f:compile"):
                     vm_recompile = C_setState("recompile", true)
 
                 # Force Transpile
-                elif (arg <?> "f:transpile").Result:
+                elif (arg == "f:transpile"):
                     vm_recompile = C_setState("recompile", true)
                     C_setTranspile(true)
 
@@ -74,11 +74,11 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     displayHelpMessage()
 
                 # Clean Up
-                elif (arg <?> "intermidiates:true").Result:
+                elif (arg == "intermidiates:true"):
                     C_setState("cleanup", false)
                     vm_recompile = C_setState("recompile", true)
 
-                elif (arg <?> "intermidiates:false").Result:
+                elif (arg == "intermidiates:false"):
                     C_setState("cleanup", true)
                     vm_recompile = C_setState("recompile", true)
                     

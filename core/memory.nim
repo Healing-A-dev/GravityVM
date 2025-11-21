@@ -4,7 +4,7 @@ import tables
 var POOL_LOCAL*: ref Table[string, string]  = new(Table[string, string])
 var POOL_GLOBAL*: ref Table[string, string] = new(Table[string, string])
 var POOL_BUFFER*: ref Table[string, string] = new(Table[string, string])
-    
+
 var MAX_SIZE_GLOBAL*: ref int
 var MAX_SIZE_LOCAL*: ref int
 var MAX_SIZE_BUFFER*:  ref int
@@ -39,7 +39,7 @@ var REGISTER*: Table[string, auto] = {
 
 
 # Incrementing Memory Addess #
-proc Increase*(T: var string, MAX: int = 122): bool {.discardable.} = 
+proc Increase*(T: var string, MAX: int = 122): bool {.discardable.} =
     var p0: int = T[0].ord()
     var p1: int = T[1].ord()
 
@@ -102,7 +102,7 @@ proc Store*(MEM_POOL: var Table[string, string], ADDR: var string, DATA: var str
     if DATA.len >= 2 and DATA[0] == '[':
         DATA = DATA[1..<(DATA.len - 1)]
     MEM_POOL[ADDR] = DATA
-    
+
     if not ADDR.Increase() or MEM_POOL.len > MAX_SIZE:
         echo "MEMORY OVERFLOW: '" & DATA & "' WAS NOT ADDED"
         quit()
@@ -136,4 +136,3 @@ proc NextAddress*(MEM_POOL: Table[string, string]): string =
         if not ADDR.Increase():
             return ADDR # Maximum capcity reached
     return ADDR
-

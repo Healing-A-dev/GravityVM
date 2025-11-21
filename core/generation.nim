@@ -2,7 +2,7 @@ import strutils
 import tables
 import instructions
 
-proc generateInstructions*(file: string): seq[string] = 
+proc generateInstructions*(file: string): seq[string] =
     let input: seq[string] = readFile(file).splitLines()
     var instructions: seq[string] = @[]
     var tmp: seq[string] = @[]
@@ -87,5 +87,3 @@ proc processInstructions*(instructions: seq[string], file: string): int =
             return 2
 
         instruction_counter.inc()
-
-            

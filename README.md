@@ -5,18 +5,18 @@
 -------
 ### About:
 GravityVM is a small, lightweight, memory/register based virtual machine that operates on a custom bytecode format.
-	
+
 	Memory addresses range from "01" -> "zz".
 	The bytecode format that GravityVM operates on follows a 4 block structure: INSTRUCTION ARG0 ARG1 ARG2.
 
-	
+
 	Each bytecode is a total length of 2 characters (ie. "02") with a few exceptions.
 	Exception 1:
 	   Anything surrounded by '[]' is either a string value, a float, any integer with a value over 100, or a special register location
 	Exception 2:
 	   Anything begining with [@, $, %] represent pointers to a location in a given memory pool
 
-	
+
 	There are 4 possible memory locations within Gravity:
 	 - Global Memory Pool [@]
 	 - Local Memory Pool [$]
@@ -55,6 +55,3 @@ GravityVM is a small, lightweight, memory/register based virtual machine that op
 	CMP:    0D [Data Location, Data Location, None]
 
 	LBL:    0J [None, None, None]
-
-
-	

@@ -80,7 +80,7 @@ proc writeCache*(file_path: string): int {.discardable.} =
     var directory: string = file_path[0..(file_location.Region[0] - 1)]
     let cache_index: tuple = indexCache(directory & ".g_cache")
     
-    if cache_index.Count + 1 == 6:
+    if cache_index.Count + 1 == 2:
         for file in cache_index.Files:
             removeFile(file)
         

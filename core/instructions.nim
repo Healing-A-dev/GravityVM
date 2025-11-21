@@ -3,17 +3,17 @@ import memory
 import strutils
 import math
 import ../codegen/codegen
-    
+
 # OPCODES
 var OP* = initTable[string, proc(memory_address: var string, arg0: var string, arg1: var string): int]()
 var OPERROR*: string = ""
 var OPWARN*: string = "Warning(s):\n"
 var instruction_counter*: int = 0
-    
+
 # Instuctions
 let Instructions*: Table[string, string] = {
     "00":    "NOP",     # Done
-    "01":    "READ",    # 
+    "01":    "READ",    # Done
     "02":    "WRITE",   # Done
     "03":    "STORE",   # Done
     "04":    "DEL",     # Done
@@ -23,15 +23,16 @@ let Instructions*: Table[string, string] = {
     "08":    "DIV",     # Done
     "09":    "EXP",     # Done
     "0A":    "COPY",    # Done
-    "0B":    "JMP",     #
-    "0C":    "JNE",     #
+    "0B":    "JMP",     # Done
+    "0C":    "JNZ",     # Done
     "0D":    "CMP",     #
     "0E":    "INC",     # Done
     "0F":    "DEC",     # Done
-    "0G":    "UPD",     #
+    "0G":    "UPD",     # Done
     "0H":    "MALLOC",  # Done
     "0I":    "FREE",    # Done
-    "0J":    "LBL",     #
+    "0J":    "LBL",     # Done
+    "0K":    "JEZ",     #
 }.toTable()
 
 
@@ -40,8 +41,9 @@ proc call(memory_pool: ref Table[string, string], address: string, pool_type: st
     if memory_pool[].hasKey(address):
         return memory_pool[][address]
     else:
-        echo "INVALID [" & pool_type & "] MEMORY ADDRESS: " & address
+        echo "Invalid [" & pool_type & "] Memory Address: " & address
         quit()
+
 
 proc getType(data: string): tuple[Type: string, Value: string]=
     var data_type: string = ""
@@ -63,7 +65,7 @@ proc getType(data: string): tuple[Type: string, Value: string]=
                 data_type = "string"
 
     return (Type: data_type, Value: data)
-            
+
 
 
 #[ OPERATIONS ]#
@@ -76,8 +78,41 @@ OP["NOP"] = proc(memory_address: var string, arg0: var string, arg1: var string)
 
 # READ
 OP["READ"] = proc(memory_address: var string, arg0: var string = "", arg1: var string = ""): int =
-    OPERROR = "IMPLEMENT OP READ"
-    return 1
+    var arg2: string = ""
+    case memory_address[0]
+    of '@':
+        arg2 = memory_address[1..<memory_address.len]
+        if not POOL_GLOBAL[].hasKey(arg2):
+            OPERROR = "Invalid [Global] Memory Address: '" & arg2 & "'"
+            return 1
+        POOL_GLOBAL[][memory_address] = "@STDIN@" & memory_address
+        C("TEXT", "READ", memory_address, "", "")
+    of '$':
+        arg2 = memory_address[1..<memory_address.len]
+        if not POOL_LOCAL[].hasKey(arg2):
+            OPERROR = "Invalid [Local] Memory Address: '" & arg2 & "'"
+            return 1
+        POOL_LOCAL[][memory_address] = "@STDIN@" & memory_address
+        C("TEXT", "READ", memory_address, "", "")
+    of '%':
+        arg2 = memory_address[1..<memory_address.len]
+        if not POOL_BUFFER[].hasKey(arg2):
+            OPERROR = "Invalid [Buffer] Memory Address: '" & arg2 & "'"
+            return 1
+        POOL_BUFFER[][memory_address] = "@STDIN@" & memory_address
+        C("TEXT", "READ", memory_address, "", "")
+    of '[':
+        arg2 = memory_address[1..<memory_address.len - 1]
+        if not REGISTER.hasKey(arg2):
+            OPERROR = "Invalid Memory Address Pointer: '" & arg2 & "'"
+            return 1
+        REGISTER[memory_address] = "@STDIN@" & memory_address
+        C("TEXT", "READ", memory_address, "", "")
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    return 0
 
 
 # WRITE
@@ -135,13 +170,13 @@ OP["STORE"] = proc(memory_address: var string, arg0: var string, arg1: var strin
     case arg0[0]
     of '@':
         arg0 = arg0.replace("@", "")
-        arg0 = call(POOL_GLOBAL, arg0, "GLOBAL")
+        arg0 = call(POOL_GLOBAL, arg0, "Global")
     of '$':
         arg0 = arg0.replace("$", "")
-        arg0 = call(POOL_LOCAL, arg0, "LOCAL")
+        arg0 = call(POOL_LOCAL, arg0, "Local")
     of '%':
         arg0 = arg0.replace("%", "")
-        arg0 = call(POOL_BUFFER, arg0, "BUFFER")
+        arg0 = call(POOL_BUFFER, arg0, "Buffer")
     of '[':
         arg0 = arg0[1..<(arg0.len - 1)]
         if REGISTER.hasKey(arg0) and REGISTER[arg0] != "":
@@ -210,7 +245,7 @@ OP["DEL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": DEL", "DEL", "[" & ADDR_BUFFER & "]")
     else:
         return 1
-        
+
     return 0
 
 
@@ -304,11 +339,11 @@ OP["COPY"] = proc(memory_address: var string, arg0: var string, arg1: var string
             C("DATA", "__comment", "  instr_" & $(instruction_counter/4) & ": STORE", "STORE", "[" & memory_address & "]")
             C("DATA", "STORE", memory_address, $arg0, "")
         else:
-            C("DATA", "__comment", "  instr_" & $(instruction_counter/4) & ": STORE", "STORE", "[" & memory_address & "]")  
+            C("DATA", "__comment", "  instr_" & $(instruction_counter/4) & ": STORE", "STORE", "[" & memory_address & "]")
             C("DATA", "STORE", memory_address, $POOL_0[arg0], "")
     else:
          C("TEXT", "STORE REGISTER", memory_address, $arg0,"")
-        
+
     return 0
 
 
@@ -341,13 +376,13 @@ OP["MALLOC"] = proc(memory_address: var string, arg0: var string, arg1: var stri
     case arg0[0]:
     of '@':
         arg0 = arg0.replace("@", "")
-        arg0 = call(POOL_GLOBAL, arg0, "GLOBAL")
+        arg0 = call(POOL_GLOBAL, arg0, "Global")
     of '$':
         arg0 = arg0.replace("$", "")
-        arg0 = call(POOL_LOCAL, arg0, "LOCAL")
+        arg0 = call(POOL_LOCAL, arg0, "Local")
     of '%':
         arg0 = arg0.replace("%", "")
-        arg0 = call(POOL_BUFFER, arg0, "BUFFER")
+        arg0 = call(POOL_BUFFER, arg0, "Buffer")
     of '[':
         arg0 = arg0[1..<(arg0.len - 1)]
         arg0 = REGISTER[arg0]
@@ -360,12 +395,12 @@ OP["MALLOC"] = proc(memory_address: var string, arg0: var string, arg1: var stri
         size_t = parseInt(arg0)
 
     current_address.Decrease()
-    
+
     for count in 1..size_t+1:
         POOL_0[].Store(current_address, data, 3843)
-        
+
     MAX_SIZE[] = POOL_0[].len
-    C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": MALLOC", "MALLOC", "[" & $size_t & " -> " & memory_address & "]")  
+    C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": MALLOC", "MALLOC", "[" & $size_t & " -> " & memory_address & "]")
 
     return 0
 
@@ -461,7 +496,7 @@ OP["ADD"] = proc(memory_address: var string, arg0: var string, arg1: var string)
                     register00 = parseFloat(POOL_0[][memory_address])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][memory_address]) & " '" & POOL_1[][arg0] & "'"
-                
+
                 return 1
         else:
             OPERROR = "Invalid Memeory Address: '" & memory_address & "'"
@@ -522,6 +557,7 @@ OP["ADD"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         REGISTER[address] = sum
 
     C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": ADD", "ADD", "[" & $register00 & " + " & $register10 & "]")
+    C("TEXT", "ADD", $register00, $register10, register2[1..<(register2.len - 1)])
     return 0
 
 
@@ -616,7 +652,7 @@ OP["SUB"] = proc(memory_address: var string, arg0: var string, arg1: var string)
                     register00 = parseFloat(POOL_0[][memory_address])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][memory_address]) & " '" & POOL_1[][arg0] & "'"
-                
+
                 return 1
         else:
             OPERROR = "Invalid Memeory Address: '" & memory_address & "'"
@@ -659,7 +695,7 @@ OP["SUB"] = proc(memory_address: var string, arg0: var string, arg1: var string)
             return 1
 
     # Subtracting Values
-    difference = $(register00 + register10)
+    difference = $(register00 - register10)
     OPWARN = OPWARN & "\tIMPLEMENT NEGATIVE NUMBER ADDING\n"
     if difference[difference.len-2..difference.len-1] == ".0":
         difference = difference[0..difference.len-3]
@@ -677,6 +713,7 @@ OP["SUB"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         REGISTER[address] = difference
 
     C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": SUB", "SUB", "[" & $register00 & " + " & $register10 & "]")
+    C("TEXT", "SUB", $register00, $register10, register2[1..<(register2.len - 1)])
     return 0
 
 
@@ -692,7 +729,7 @@ OP["MUL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     var register1: string = ""
     var register2: string = ""
     var symbol: char = arg1[0]
-    var product: string = ""
+    var difference: string = ""
 
     # Memory Address
     case memory_address[0]
@@ -710,7 +747,7 @@ OP["MUL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         if REGISTER.hasKey(memory_address) and REGISTER[memory_address] != "":
             register0 = memory_address
         else:
-            OPERROR = "INVALID OR EMPTY REGISTER ADDRESS: " & memory_address
+            OPERROR = "Invalid or Empty Register Address: '" & memory_address & "'"
             return 1
     else:
         return 1
@@ -731,7 +768,7 @@ OP["MUL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         if REGISTER.hasKey(arg0) and REGISTER[arg0] != "":
             register1 = arg0
         else:
-            OPERROR = "INVALID OR EMPTY MEMORY ADDRESS: " & arg0
+            OPERROR = "Invalid or Empty Memory Address: '" & arg0 & "'"
             return 1
     else:
         return 1
@@ -752,7 +789,7 @@ OP["MUL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         if REGISTER.hasKey(arg1):
             register2 = arg1
         else:
-            OPERROR = "INVALID REGISTER ADDRES: " & arg1
+            OPERROR = "Invalid Register Address: '" & arg1 & "'"
             return 1
     else:
         register2 = "[sra]"
@@ -762,12 +799,19 @@ OP["MUL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     if register0 == "":
         if POOL_0[].hasKey(memory_address):
             try:
-                register00 = parseFloat(POOL_0[][memory_address])
+                case POOL_0[][memory_address][0]
+                of '[':
+                    var tmp: string = POOL_0[][memory_address]
+                    tmp = tmp[1..tmp.len-2]
+                    register00 = parseFloat(tmp)
+                else:
+                    register00 = parseFloat(POOL_0[][memory_address])
             except ValueError as e:
-                OPERROR = e.msg
+                OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][memory_address]) & " '" & POOL_1[][arg0] & "'"
+
                 return 1
         else:
-            OPERROR = "INVALID MEMORY ADDRESS: " & memory_address
+            OPERROR = "Invalid Memeory Address: '" & memory_address & "'"
             return 1
     else:
         try:
@@ -780,37 +824,52 @@ OP["MUL"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     if register1 == "":
         if POOL_1[].hasKey(arg0):
             try:
-                register10 = parseFloat(POOL_1[][arg0])
+                case POOL_1[][arg0][0]
+                of '[':
+                    var tmp: string = POOL_1[][arg0]
+                    tmp = tmp[1..tmp.len-2]
+                    register10 = parseFloat(tmp)
+                else:
+                    register10 = parseFloat(POOL_1[][arg0])
             except ValueError as e:
-                OPERROR = e.msg
+                OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][arg0]) & " '" & POOL_1[][arg0] & "'"
                 return 1
         else:
-            OPERROR = "INVALID MEMORY ADDRESS: " & arg0
+            OPERROR = "Invalid Memory Address: '" & arg0 & "'"
             return 1
     else:
         try:
-            register10 = parseFloat(REGISTER[register1])
+            case REGISTER[register1][0]
+            of '[':
+                var tmp: string = REGISTER[register1]
+                tmp = tmp[1..tmp.len-2]
+                register10 = parseFloat(tmp)
+            else:
+                register10 = parseFloat(REGISTER[register1])
         except ValueError as e:
-            OPERROR = e.msg
+            OPERROR = "Invalid Float '" & REGISTER[register1] & "'"
             return 1
 
-    # Adding Values
-    product = $(register00 * register10)
-    OPWARN = OPWARN & "\tIMPLEMENT NEGATIVE NUMBER ADDING\n"
-    if product.len > 2:
-        product = "[" & product & "]"
+    # Subtracting Values
+    difference = $(register00 * register10)
+    OPWARN = OPWARN & "\tIMPLEMENT NEGATIVE NUMBER MULTIPLICATION\n"
+    if difference[difference.len-2..difference.len-1] == ".0":
+        difference = difference[0..difference.len-3]
+    if difference.len > 2:
+        difference = "[" & difference & "]"
 
     # Storing Data
     if register2 == "":
         var address: string = symbol & arg1
         var nop = ""
-        if OP["COPY"](address, product, nop) != 0:
+        if OP["COPY"](address, difference, nop) != 0:
             return 1
     else:
         var address: string = register2[1..<(register2.len - 1)]
-        REGISTER[address] = product
+        REGISTER[address] = difference
 
-    C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": MUL", "MUL", "[" & $register00 & " * " & $register10 & "]")
+    C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": MUL", "MUL", "[" & $register00 & " + " & $register10 & "]")
+    C("TEXT", "MUL", $register00, $register10, register2[1..<(register2.len - 1)])
     return 0
 
 
@@ -943,7 +1002,7 @@ OP["DIV"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = quotient
-        
+
     C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": DIV", "DIV", "[" & $register00 & " / " & $register10 & "]")
     return 0
 
@@ -1077,7 +1136,7 @@ OP["EXP"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = power
-        
+
     C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": EXP", "EXP", "[" & $register00 & " ^ " & $register10 & "]")
     return 0
 
@@ -1101,23 +1160,26 @@ OP["DEC"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     var nop: string = "00"
 
     if OP["SUB"](memory_address, num, nop) != 0:
-        return 1 
+        return 1
 
     return 0
 
 
-OP["FREE"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
 # FREE
+OP["FREE"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
     case memory_address
     of "@00":
         C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": FREE", "FREE", "[GLOBAL]")
         POOL_GLOBAL[].Free()
+        ADDR_GLOBAL.Zero()
     of "$00":
         C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": FREE", "FREE", "[LOCAL]")
         POOL_LOCAL[].Free()
+        ADDR_LOCAL.Zero()
     of "%00":
         C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": FREE", "FREE", "[BUFFER]")
         POOL_BUFFER[].Free()
+        ADDR_BUFFER.Zero()
     else:
         OPERROR = "INVALID MEMORY POOL ADDRESS: " & memory_address
         return 1
@@ -1135,27 +1197,165 @@ OP["UPD"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     # Memory Address
     case memory_address[0]
     of '@':
-        memory_address = memory_address.replace("@", "")
         POOL_0 = POOL_GLOBAL
     of '$':
-        memory_address = memory_address.replace("$", "")
         POOL_0 = POOL_LOCAL
     of '%':
-        memory_address = memory_address.replace("%", "")
         POOL_0 = POOL_BUFFER
     of '[':
-        memory_address = memory_address[1..<(memory_address.len - 1)]
-        if REGISTER.hasKey(memory_address):
-            register0 = memory_address
+        let arg3 = memory_address[1..<(memory_address.len - 1)]
+        if REGISTER.hasKey(arg3):
+            register0 = arg3
         else:
             OPERROR = "INVALID: " & memory_address
             return 1
     else:
         return 1
 
-    #echo getType(POOL_0[][memory_address]).Type
-    #echo POOL_0[][memory_address]
-
     # echo "UPDATE " & arg0
-        
+    C("VOID", "__comment", "UPD", "UPD", arg0 & " -> " & memory_address)
+    C("TEXT", "UPD", memory_address, arg0, "")
+    return 0
+
+
+# LABEL
+OP["LBL"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
+    var memory_address: string = memory_address
+    case memory_address[0]
+    of '@':
+        memory_address = call(POOL_GLOBAL, memory_address[1..<memory_address.len], "Global")
+    of '$':
+        memory_address = call(POOL_LOCAL, memory_address[1..<memory_address.len], "Local")
+    of '%':
+        memory_address = call(POOL_BUFFER, memory_address[1..<memory_address.len], "Buffer")
+    of '[':
+        let arg3: string = memory_address[1..<memory_address.len - 1]
+        if REGISTER.hasKey(arg3):
+            memory_address = REGISTER[arg3]
+        else:
+            memory_address = memory_address[1..<memory_address.len - 1]
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    if memory_address == "":
+        OPERROR = "Value expected, got: " & memory_address
+        return 1
+    elif $(typeof(memory_address)) != "string":
+        OPERROR = "String value expected, got: " & $(typeof(memory_address))
+        return 1
+
+    C("TEXT", "__comment", "LBL", "LBL", memory_address)
+    C("TEXT", "LBL", memory_address, "", "")
+    return 0
+
+
+# JUMP
+OP["JMP"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
+    var memory_address: string = memory_address
+    case memory_address[0]
+    of '@':
+        memory_address = call(POOL_GLOBAL, memory_address[1..<memory_address.len], "Global")
+    of '$':
+        memory_address = call(POOL_LOCAL, memory_address[1..<memory_address.len], "Local")
+    of '%':
+        memory_address = call(POOL_BUFFER, memory_address[1..<memory_address.len], "Buffer")
+    of '[':
+        let arg3: string = memory_address[1..<memory_address.len - 1]
+        if REGISTER.hasKey(arg3):
+            memory_address = REGISTER[arg3]
+        else:
+            memory_address = memory_address[1..<memory_address.len - 1]
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    if memory_address == "":
+        OPERROR = "Value expected, got: " & memory_address
+        return 1
+    elif $(typeof(memory_address)) != "string":
+        OPERROR = "String value expected, got: " & $(typeof(memory_address))
+        return 1
+
+    C("TEXT", "__comment", "JMP", "JMP", memory_address)
+    C("TEXT", "JMP", memory_address, "", "")
+    return 0
+
+
+# JUMP IF NOT ZERO
+OP["JNZ"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
+    var memory_address: string = memory_address
+    case memory_address[0]
+    of '@':
+        memory_address = call(POOL_GLOBAL, memory_address[1..<memory_address.len], "Global")
+    of '$':
+        memory_address = call(POOL_LOCAL, memory_address[1..<memory_address.len], "Local")
+    of '%':
+        memory_address = call(POOL_BUFFER, memory_address[1..<memory_address.len], "Buffer")
+    of '[':
+        let arg3: string = memory_address[1..<memory_address.len - 1]
+        if REGISTER.hasKey(arg3):
+            memory_address = REGISTER[arg3]
+        else:
+            memory_address = memory_address[1..<memory_address.len - 1]
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    if memory_address == "":
+        OPERROR = "Value expected, got: " & memory_address
+        return 1
+    elif $(typeof(memory_address)) != "string":
+        OPERROR = "String value expected, got: " & $(typeof(memory_address))
+        return 1
+
+    C("TEXT", "JNZ", memory_address, "", "")
+    return 0
+
+
+# COMPARE
+OP["CMP"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
+    var slot1: string = ""
+    var slot2: string = ""
+    var address1: string = memory_address[1..<memory_address.len]
+    var address2: string = arg0[1..<arg0.len]
+
+    case memory_address[0]
+    of '@':
+        slot1 = POOL_GLOBAL[][address1]
+    of '$':
+        slot1 = POOL_LOCAL[][address1]
+    of '%':
+        slot1 = POOL_BUFFER[][address1]
+    of '[':
+        address1 = memory_address[1..<memory_address.len - 1]
+        if REGISTER.hasKey(address1):
+            slot1 = REGISTER[address1]
+        else:
+            OPERROR = "Invalid Register Location: '" & address1 & "'"
+            return 1
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    case arg0[0]
+    of '@':
+        slot1 = POOL_GLOBAL[][address2]
+    of '$':
+        slot1 = POOL_LOCAL[][address2]
+    of '%':
+        slot1 = POOL_BUFFER[][address2]
+    of '[':
+        address2 = memory_address[1..<memory_address.len - 1]
+        if REGISTER.hasKey(address2):
+            slot1 = REGISTER[address2]
+        else:
+            OPERROR = "Invalid Register Location: '" & address2 & "'"
+            return 1
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    C("TEXT", "__comment", "CMP", "CMP", slot1 & " ? " & slot2)
+    C("TEXT", "CMP", slot1, slot2, "")
     return 0
