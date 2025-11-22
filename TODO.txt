@@ -1,5 +1,7 @@
 TODO:
+* Finish Perl Interpreter (HIGH PRIORITY) *
 
+-------------------------------------------
 * Create ASM targets
-* Create Interpreter (Have to determine what language first)
 * Fix floats only print the first digit after the decimal correctly
+* Implement remaining OPCODES

@@ -6,7 +6,7 @@ var vm_recompile*: bool = false
 var vm_file_out*: string = ""
 var vm_file_in*: string = ""
 var vm_build*: bool = false
-var vm_run*:bool = false
+var vm_run*: bool = false
 
 
 proc join(list: seq[auto], sep: string = ""): string =
@@ -18,7 +18,7 @@ proc join(list: seq[auto], sep: string = ""): string =
         else:
             outstr = outstr & $list[i]
     return outstr
-        
+
 
 proc displayHelpMessage(): void =
     const message_head: string = "Usage: gravity <command> <options?>"
@@ -28,10 +28,12 @@ proc displayHelpMessage(): void =
         "  build                  Compile the given bytecode file",
         "  run                    Compile and run the given bytecode file",
         "Options:",
-        "  --help                  Display this message and exit",
-        "  -i:[input_file]         Set the input file",
-        "  -o:[output_file]        Set the output file <Optional>",
-        "  -f:[complie|transpile]  Force compilation, ignoring the current cache file | Force transpilation instead of automatic compilation/transpilation",
+        "  --help                     Display this message and exit",
+        "  --version                  Display the current version of gravity",
+        "  -i:[input_file]            Set the input file",
+        "  -o:[output_file]           Set the output file <Optional>",
+        "  -f:[complie|transpile]     Force compilation, ignoring the current cache file | Force transpilation instead of automatic compilation/transpilation",
+        "  -w:[true (default)|false]  Set the warning state to either show (or not show) warnings",
         "  -intermediates:[true|false (default)]  Prevent clean-up after execution, keeping all intermediate files",
     ]
     echo message_head & "\n" & message_body.join("\n")
@@ -49,7 +51,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 arg = arg[1..<arg.len]
                 # Output file
                 if (arg <?> "o:").Result:
-                    let fname:string = arg.chomp("o:") 
+                    let fname:string = arg.chomp("o:")
                     vm_file_out = C_setOutputFile(fname)
 
                 # Input File
@@ -70,7 +72,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     C_setTranspile(true)
 
                 # Help Message
-                elif (arg <?> "-help").Result:
+                elif (arg == "-help"):
                     displayHelpMessage()
 
                 # Clean Up
@@ -81,13 +83,28 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 elif (arg == "intermidiates:false"):
                     C_setState("cleanup", true)
                     vm_recompile = C_setState("recompile", true)
-                    
+
+                # Version
+                elif (arg == "-version"):
+                    echo "GravityVM (gravity): "
+                    echo "|> Version: " & c_version
+                    echo "|> Lisence: MIT 2025"
+                    quit()
+
+                # Warnings
+                elif (arg == "w:true"):
+                    echo "IMPLEMENT WARNINGS!!!"
+                    echo "CREATE c_warn!!!"
+
+                elif (arg == "w:false"):
+                    echo "WARNINGS OFF <IMPLEMENT>!!!"
+
                 else:
                     echo "gravity: invalid option: " & $argv[i]
                     displayHelpMessage()
             else:
                 discard
-                    
+
             case argv[0]
             of "build":
                 vm_build = C_setState("build", true)
@@ -99,7 +116,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
             else:
                 echo "gravity: invalid command: " & argv[0]
                 displayHelpMessage()
-                    
+
     # Error Handling
     if vm_file_in == "":
         echo "\e[1mgravity: <\e[91mIO-Error\e[0m\e[1m>\e[0m"
@@ -116,7 +133,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
         echo "|\e[90m--------\e[0m> File or directory does not exist"
         #echo "\e[90m|> nim: " & e.msg & "\e[0m"
         quit()
-        
+
     # Hard set debug mode to false (if it was never set to true)
     if not vm_debug:
         discard C_setDebug(false,false)

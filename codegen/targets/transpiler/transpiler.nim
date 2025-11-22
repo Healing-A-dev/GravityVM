@@ -3,8 +3,6 @@ import strutils
 import ../../../core/memory
 
 var vm_transpiler* = initTable[string, proc(d0: string, d1: string, d2: string): string]()
-var variables*: Table[string, string] = initTable[string, string]()
-
 
 # Utility Functions #
 proc append(to: var string, data: string): string {.discardable.} =
@@ -262,17 +260,50 @@ vm_transpiler["JMP"] = proc(d0: string, d1: string, d2: string): string =
 
 vm_transpiler["JNZ"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    to_append.append("    if ($InnerShell::REGISTERS{\"sra\"} != 0) {")
-    to_append.append("        goto lbl" & d0)
-    to_append.append("    }")
+    to_append.append("    goto lbl" & d0 & " if ($InnerShell::REGISTERS{\"sra\"} != 0);")
     return to_append
+
+
+vm_transpiler["JEZ"] = proc(d0: string, d1: string, d2: string): string =
+    echo "IMPLEMENT JUMP IF EQUAL ZERO"
+    quit()
 
 
 vm_transpiler["CMP"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    if d0 == d1:
-        to_append.append(vm_transpiler["STORE"]("[sra]", "0", ""))
-    else:
-        to_append.append(vm_transpiler["STORE"]("[sra]", "1", ""))
+    var d0: string = d0
+    var d1: string = d1
 
+    case d0[0]:
+    of '@':
+        d0 = "G" & d0[1..<d0.len] & "_gravityV"
+    of '$':
+        d0 = "L" & d0[1..<d0.len] & "_gravityV"
+    of '%':
+        d0 = "B" & d0[1..<d0.len] & "_gravityV"
+    of '[':
+        echo "WIP"
+    else:
+        discard
+
+    case d1[0]:
+    of '@':
+        d1 = "G" & d1[1..<d1.len] & "_gravityV"
+    of '$':
+        d1 = "L" & d1[1..<d1.len] & "_gravityV"
+    of '%':
+        d1 = "B" & d1[1..<d1.len] & "_gravityV"
+    of '[':
+        echo "WIP"
+    else:
+        discard
+
+    to_append.append("    &OuterShell::compare(\"" & d0 & "\", \"" & d1 & "\", \"sra\");")
+
+    return to_append
+
+
+vm_transpiler["EXIT"] = proc(d0: string, d1: string, d2: string): string =
+    var to_append: string = ""
+    to_append.append("    exit " & d0 & ";")
     return to_append

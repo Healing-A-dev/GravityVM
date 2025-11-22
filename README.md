@@ -50,8 +50,11 @@ GravityVM is a small, lightweight, memory/register based virtual machine that op
 	INC:    0E [Data Location, None, None]
 	DEC:    0F [Data Location, None, None]
 
-	JMP:    0B [Labal Location, None, None]
-	JNZ:    0C [Label Location, Data Location/Number, None]
+	JMP:    0B [Labal, None, None]
+	JNZ:    0C [Label, None, None]
+	JEZ:    0K [Label, None, None]
 	CMP:    0D [Data Location, Data Location, None]
 
-	LBL:    0J [None, None, None]
+	LBL:    0J [String, None, None]
+
+	EXIT:   0L [Data Location/Number, None, None]

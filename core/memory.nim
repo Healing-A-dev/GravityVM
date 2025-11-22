@@ -30,7 +30,7 @@ var REGISTER*: Table[string, auto] = {
     "srd": "",
     "sre": "",
     "fhr": "",  # Not accessable threw normal means (internal for internal useage only)
-    "srnl": "\n", # Not accessable threw normal means (internal for internal useage only)
+    "srnl": "\\n", # Not accessable threw normal means (internal for internal useage only)
 }.toTable()
 
 

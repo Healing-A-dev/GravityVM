@@ -1,13 +1,10 @@
-# Cache file that is generated after building hello.gravity
-# ALL cache files are stored in .g_cahce in the same directory that the input file was located in
-
 (Start: Project
     (Definition: Name => examples/hello)
     (Definition: File => "examples/hello.gravity")
-    (Definition: Identifier => 6139]G)
+    (Definition: Identifier => 30793>o#)
     (Class: ProjectData => (
-        (Definition: Instructions => 8)
-        (Definition: Program => 0H$0010002[Enter your name: ]000001$01000002[Hello ]000002$01000002[!]000002[srnl]00000I$000000)
+        (Definition: Instructions => 25)
+        (Definition: Program => 0H$001000003$02[100]0003$03[Healing]000J[Do_AGAIN]000002[Enter the correct name: ]000001$0100000D$03$01000C[WRONG]000002[Hello ]000002[\033[32m]000002$01000002[\033[0m!]000002[srnl]000002[srnl]000002[-------------------------------\n]000002[Congraulations on guessing the correct name!\n]000002[Your prize is....NOTHINGGGG :D\n]00000L[0]00000J[WRONG]000002[Incorrect Name: ]000002[\033[91m]000002$01000002[\033[0m\n]00000B[Do_AGAIN]00000I$000000)
     ))
     (Definition: CompilerVersion => "0.1 Neutron")
 End: Project)

@@ -7,6 +7,7 @@ import targets/transpiler/packaging
 import ../core/pattern
 
 # Instance Variables
+const c_version*: string = "0.0.1 +11"
 var
     c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] = vm_getTarget()
     c_rodata: seq[string] = @[]
@@ -16,14 +17,13 @@ var
     c_bss: seq[string] = @[]
     c_debug: bool = true
     c_clean: bool = true
-    c_input: string = ""
+    c_input*: string = ""
     c_output*: string = ""
     c_recompile: bool = false
     c_transpile: bool = false
+    c_tmp: string = "out"
     c_build: bool = false
     c_run: bool = false
-    c_tmp: string = "out"
-
 
 
 # Directory Stripper

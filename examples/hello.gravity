@@ -1,8 +1,34 @@
-0H $00 1 00
-02 [Enter your name: ] 00 00
+0H $00 100 00
+03 $02 [100] 00
+03 $03 [Healing] 00
+
+0J [Do_AGAIN] 00 00
+02 [Enter the correct name: ] 00 00
 01 $01 00 00
+
+
+0D $03 $01 00
+0C [WRONG] 00 00
+
+
 02 [Hello ] 00 00
+02 [\033[32m] 00 00
 02 $01 00 00
-02 [!] 00 00
+02 [\033[0m!] 00 00
 02 [srnl] 00 00
+02 [srnl] 00 00
+02 [-------------------------------\n] 00 00
+02 [Congraulations on guessing the correct name!\n] 00 00
+02 [Your prize is....NOTHINGGGG :D\n] 00 00
+0L [0] 00 00
+
+
+0J [WRONG] 00 00
+02 [Incorrect Name: ] 00 00
+02 [\033[91m] 00 00
+02 $01 00 00
+02 [\033[0m\n] 00 00
+0B [Do_AGAIN] 00 00
+
+
 0I $00 00 00

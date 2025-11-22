@@ -20,12 +20,12 @@ let Instructions*: Table[string, string] = {
     "05":    "ADD",     # Done
     "06":    "SUB",     # Done
     "07":    "MUL",     # Done
-    "08":    "DIV",     # Done
-    "09":    "EXP",     # Done
+    "08":    "DIV",     #
+    "09":    "EXP",     #
     "0A":    "COPY",    # Done
     "0B":    "JMP",     # Done
     "0C":    "JNZ",     # Done
-    "0D":    "CMP",     #
+    "0D":    "CMP",     # Done
     "0E":    "INC",     # Done
     "0F":    "DEC",     # Done
     "0G":    "UPD",     # Done
@@ -33,15 +33,21 @@ let Instructions*: Table[string, string] = {
     "0I":    "FREE",    # Done
     "0J":    "LBL",     # Done
     "0K":    "JEZ",     #
+    "0L":    "EXIT",    # Done
 }.toTable()
 
 
 # Utility
-proc call(memory_pool: ref Table[string, string], address: string, pool_type: string): auto =
+proc call(memory_pool: ref Table[string, string], address: string, pool_type: string): auto {.discardable.} =
     if memory_pool[].hasKey(address):
         return memory_pool[][address]
     else:
-        echo "Invalid [" & pool_type & "] Memory Address: " & address
+        echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
+        echo "|> Compilation Stopped!"
+        echo "|> Reason: Invalid [" & pool_type & "] Memory Address: " & address
+        echo "|> Where:"
+        echo "|\e[90m--------\e[0m> File: " & c_input
+        echo "|\e[90m--------\e[0m> Line: " & $((instruction_counter / 4) + 1)
         quit()
 
 
@@ -79,28 +85,32 @@ OP["NOP"] = proc(memory_address: var string, arg0: var string, arg1: var string)
 # READ
 OP["READ"] = proc(memory_address: var string, arg0: var string = "", arg1: var string = ""): int =
     var arg2: string = ""
+    var arg3: string = "@STDIN@" & memory_address
     case memory_address[0]
     of '@':
         arg2 = memory_address[1..<memory_address.len]
         if not POOL_GLOBAL[].hasKey(arg2):
             OPERROR = "Invalid [Global] Memory Address: '" & arg2 & "'"
             return 1
-        POOL_GLOBAL[][memory_address] = "@STDIN@" & memory_address
+        POOL_GLOBAL[].Store(arg2, arg3, MAX_SIZE_GLOBAL[])
         C("TEXT", "READ", memory_address, "", "")
+
     of '$':
         arg2 = memory_address[1..<memory_address.len]
         if not POOL_LOCAL[].hasKey(arg2):
             OPERROR = "Invalid [Local] Memory Address: '" & arg2 & "'"
             return 1
-        POOL_LOCAL[][memory_address] = "@STDIN@" & memory_address
+        POOL_LOCAL[].Store(arg2, arg3, MAX_SIZE_LOCAL[])
         C("TEXT", "READ", memory_address, "", "")
+
     of '%':
         arg2 = memory_address[1..<memory_address.len]
         if not POOL_BUFFER[].hasKey(arg2):
             OPERROR = "Invalid [Buffer] Memory Address: '" & arg2 & "'"
             return 1
-        POOL_BUFFER[][memory_address] = "@STDIN@" & memory_address
+        POOL_BUFFER[].Store(arg2, arg3, MAX_SIZE_BUFFER[])
         C("TEXT", "READ", memory_address, "", "")
+
     of '[':
         arg2 = memory_address[1..<memory_address.len - 1]
         if not REGISTER.hasKey(arg2):
@@ -108,6 +118,7 @@ OP["READ"] = proc(memory_address: var string, arg0: var string = "", arg1: var s
             return 1
         REGISTER[memory_address] = "@STDIN@" & memory_address
         C("TEXT", "READ", memory_address, "", "")
+
     else:
         OPERROR = "Invalid Memory Location: '" & memory_address & "'"
         return 1
@@ -1146,7 +1157,6 @@ OP["INC"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     # Instance Variables
     var num: string = "1"
     var nop: string = "00"
-
     if OP["ADD"](memory_address, num, nop) != 0:
         return 1
 
@@ -1158,7 +1168,6 @@ OP["DEC"] = proc(memory_address: var string, arg0: var string, arg1: var string)
     # Instance Variables
     var num: string = "1"
     var nop: string = "00"
-
     if OP["SUB"](memory_address, num, nop) != 0:
         return 1
 
@@ -1184,6 +1193,7 @@ OP["FREE"] = proc(memory_address: var string, arg0: var string, arg1: var string
         OPERROR = "INVALID MEMORY POOL ADDRESS: " & memory_address
         return 1
 
+    #C("TEXT", "FREE", "", "", "")
 
     return 0
 
@@ -1309,53 +1319,106 @@ OP["JNZ"] = proc(memory_address: var string, arg0: var string, arg1: var string)
         OPERROR = "String value expected, got: " & $(typeof(memory_address))
         return 1
 
+    C("TEXT", "__comment", "JNZ", "JNZ", memory_address)
     C("TEXT", "JNZ", memory_address, "", "")
+    return 0
+
+
+# JUMP IF ZERO
+OP["JEZ"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
+    var memory_address: string = memory_address
+    case memory_address[0]
+    of '@':
+        memory_address = call(POOL_GLOBAL, memory_address[1..<memory_address.len], "Global")
+    of '$':
+        memory_address = call(POOL_LOCAL, memory_address[1..<memory_address.len], "Local")
+    of '%':
+        memory_address = call(POOL_BUFFER, memory_address[1..<memory_address.len], "Buffer")
+    of '[':
+        let arg3: string = memory_address[1..<memory_address.len - 1]
+        if REGISTER.hasKey(arg3):
+            memory_address = REGISTER[arg3]
+        else:
+            memory_address = memory_address[1..<memory_address.len - 1]
+    else:
+        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        return 1
+
+    if memory_address == "":
+        OPERROR = "Value expected, got: " & memory_address
+        return 1
+    elif $(typeof(memory_address)) != "string":
+        OPERROR = "String value expected, got: " & $(typeof(memory_address))
+        return 1
+
+    C("TEXT", "__comment", "JEZ", "JEZ", memory_address)
+    C("TEXT", "JEZ", memory_address, "", "")
     return 0
 
 
 # COMPARE
 OP["CMP"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
-    var slot1: string = ""
-    var slot2: string = ""
-    var address1: string = memory_address[1..<memory_address.len]
-    var address2: string = arg0[1..<arg0.len]
-
-    case memory_address[0]
+    case memory_address[0]:
     of '@':
-        slot1 = POOL_GLOBAL[][address1]
+        call(POOL_GLOBAL, memory_address[1..<memory_address.len], "Global")
     of '$':
-        slot1 = POOL_LOCAL[][address1]
+        call(POOL_LOCAL, memory_address[1..<memory_address.len], "Local")
     of '%':
-        slot1 = POOL_BUFFER[][address1]
+        call(POOL_BUFFER, memory_address[1..<memory_address.len], "Buffer")
     of '[':
-        address1 = memory_address[1..<memory_address.len - 1]
-        if REGISTER.hasKey(address1):
-            slot1 = REGISTER[address1]
-        else:
-            OPERROR = "Invalid Register Location: '" & address1 & "'"
+        if not REGISTER.hasKey(memory_address[1..<memory_address.len - 1]):
+            OPERROR = "Invalid Register Address: '" & memory_address[1..<memory_address.len - 1] & "'"
             return 1
     else:
         OPERROR = "Invalid Memory Location: '" & memory_address & "'"
         return 1
 
-    case arg0[0]
+    case arg0[0]:
     of '@':
-        slot1 = POOL_GLOBAL[][address2]
+        call(POOL_GLOBAL, arg0[1..<arg0.len], "Global")
     of '$':
-        slot1 = POOL_LOCAL[][address2]
+        call(POOL_LOCAL, arg0[1..<arg0.len], "Local")
     of '%':
-        slot1 = POOL_BUFFER[][address2]
+        call(POOL_BUFFER, arg0[1..<arg0.len], "Buffer")
     of '[':
-        address2 = memory_address[1..<memory_address.len - 1]
-        if REGISTER.hasKey(address2):
-            slot1 = REGISTER[address2]
-        else:
-            OPERROR = "Invalid Register Location: '" & address2 & "'"
+        if not REGISTER.hasKey(arg0[1..<arg0.len - 1]):
+            OPERROR = "Invalid Register Address: '" & arg0[1..<arg0.len - 1] & "'"
             return 1
     else:
-        OPERROR = "Invalid Memory Location: '" & memory_address & "'"
+        OPERROR = "Invalid Memory Location: '" & arg0 & "'"
         return 1
 
-    C("TEXT", "__comment", "CMP", "CMP", slot1 & " ? " & slot2)
-    C("TEXT", "CMP", slot1, slot2, "")
+    C("TEXT", "__comment", "CMP", "CMP", memory_address & " ? " & arg0)
+    C("TEXT", "CMP", memory_address, arg0, "")
     return 0
+
+
+# EXIT
+OP["EXIT"] = proc(memory_address: var string, arg0: var string, arg1: var string): int =
+    var errcode: string = ""
+    case memory_address[0]:
+    of '@':
+        errcode = call(POOL_GLOBAL, memory_address[1..<memory_address.len], "Global")
+    of '$':
+        errcode = call(POOL_LOCAL, memory_address[1..<memory_address.len], "Local")
+    of '%':
+        errcode = call(POOL_BUFFER, memory_address[1..<memory_address.len], "Buffer")
+    of '[':
+        if REGISTER.hasKey(memory_address[1..<memory_address.len - 1]):
+            if REGISTER[memory_address[1..<memory_address.len - 1]] != "":
+                errcode = REGISTER[memory_address[1..<memory_address.len - 1]]
+            else:
+                errcode = memory_address[1..<memory_address.len - 1]
+        else:
+            errcode = memory_address[1..<memory_address.len - 1]
+    else:
+        errcode = memory_address
+
+    try:
+        discard parseInt(errcode)
+    except ValueError as e:
+        OPERROR = e.msg
+        return 1
+
+    C("TEXT", "__comment", "EXIT", "EXIT", memory_address)
+    C("TEXT", "EXIT", errcode, "", "")
