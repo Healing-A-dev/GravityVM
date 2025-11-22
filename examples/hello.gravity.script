@@ -1,3 +1,6 @@
+# Cache file generated after building hello.gravity
+# ALL cache files will/are stored in a .g_cache folder in the directory were the input file is located
+
 (Start: Project
     (Definition: Name => examples/hello)
     (Definition: File => "examples/hello.gravity")
