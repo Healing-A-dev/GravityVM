@@ -33,7 +33,8 @@ var REGISTER*: Table[string, auto] = {
     "srnl": "\\n", # Not accessable threw normal means (internal for internal useage only)
 }.toTable()
 
-
+# Labels #
+var LABELS*: Table[string, int] = initTable[string, int]()
 
 #[ MEMORY POOL MANAGMENT ]#
 

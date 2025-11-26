@@ -7,6 +7,8 @@ var vm_file_out*: string = ""
 var vm_file_in*: string = ""
 var vm_build*: bool = false
 var vm_run*: bool = false
+var vm_version*: string = c_version
+var vm_execTarget*: string = ""
 
 
 proc join(list: seq[auto], sep: string = ""): string =
@@ -32,7 +34,7 @@ proc displayHelpMessage(): void =
         "  --version                  Display the current version of gravity",
         "  -i:[input_file]            Set the input file",
         "  -o:[output_file]           Set the output file <Optional>",
-        "  -f:[complie|transpile]     Force compilation, ignoring the current cache file | Force transpilation instead of automatic compilation/transpilation",
+        "  -f:[native|perl]           Force recompilation, ignoring the current cache file | Force perl transpilation instead of automatic compilation/transpilation",
         "  -w:[true (default)|false]  Set the warning state to either show (or not show) warnings",
         "  -intermediates:[true|false (default)]  Prevent clean-up after execution, keeping all intermediate files",
     ]
@@ -63,12 +65,14 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     vm_file_in = C_setInputFile(fname)
 
                 # Force Recompile
-                elif (arg == "f:compile"):
+                elif (arg == "f:native"):
                     vm_recompile = C_setState("recompile", true)
+                    vm_execTarget = "native"
 
                 # Force Transpile
-                elif (arg == "f:transpile"):
+                elif (arg == "f:perl"):
                     vm_recompile = C_setState("recompile", true)
+                    vm_execTarget = "perl"
                     C_setTranspile(true)
 
                 # Help Message

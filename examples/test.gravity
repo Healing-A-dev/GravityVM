@@ -1,29 +1,13 @@
-0H $00 100 00
-0H %00 1 00
-03 $01 580 00
-03 $02 500 00
-03 %01 [Conheat] 00
-03 $04 [Conheat] 00
+0H @00 3000 00
+0H $00 3000 00
+0H %00 3000 00
 
+03 $03 [This is a string] 00
 
-
-0J [name] 00 00
-
-02 [Enter your name: ] 00 00
-01 $03 00 00
-02 [Hello ] 00 00
+02 [Hello, World!\n] 00 00
 02 $03 00 00
-02 [!] 00 00
 02 [srnl] 00 00
 
-
-0D %01 $04 00
-0C [INCCORECT] 00 00
-
-02 [Congrats!!!!] 00 00
-
-
-
-0J [INCCORECT] 00 00
-02 [Incorrect Name blob\n] 00 00
-0B [name] 00 00
+0I @00 00 00
+0I $00 00 00
+0I %00 00 00

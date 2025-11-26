@@ -3,6 +3,7 @@ import strutils
 import ../../../core/memory
 
 var vm_transpiler* = initTable[string, proc(d0: string, d1: string, d2: string): string]()
+var labels: Table[string, int] = initTable[string, int]()
 
 # Utility Functions #
 proc append(to: var string, data: string): string {.discardable.} =
@@ -254,7 +255,7 @@ vm_transpiler["LBL"] = proc(d0: string, d1: string, d2: string): string =
 
 vm_transpiler["JMP"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    to_append.append("    goto lbl" & d0)
+    to_append.append("    goto lbl" & d0 & ";")
     return to_append
 
 
@@ -265,8 +266,9 @@ vm_transpiler["JNZ"] = proc(d0: string, d1: string, d2: string): string =
 
 
 vm_transpiler["JEZ"] = proc(d0: string, d1: string, d2: string): string =
-    echo "IMPLEMENT JUMP IF EQUAL ZERO"
-    quit()
+    var to_append: string = ""
+    to_append.append("    goto lbl" & d0 & " if ($InnerShell::REGISTERS{\"sra\"} == 0);")
+    return to_append
 
 
 vm_transpiler["CMP"] = proc(d0: string, d1: string, d2: string): string =
@@ -306,4 +308,26 @@ vm_transpiler["CMP"] = proc(d0: string, d1: string, d2: string): string =
 vm_transpiler["EXIT"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
     to_append.append("    exit " & d0 & ";")
+    return to_append
+
+
+vm_transpiler["INC"] = proc(d0: string, d1: string, d2: string): string =
+    var to_append: string = ""
+    var d1: string = d1
+
+    case d0[0]:
+    of '@':
+        d1 = "G" & d0[1..<d0.len] & "_gravityV"
+    of '$':
+        d1 = "L" & d0[1..<d0.len] & "_gravityV"
+    of '%':
+        d1 = "B" & d0[1..<d0.len] & "_gravityV"
+    of '[':
+        echo "WIP"
+    else:
+        discard
+
+    #to_append.append("    &InnerShell::setRegister(\"srb\", 1);")
+    to_append.append("    &OuterShell::add(\"" & d1 & "\", 1, \"sra\");")
+    to_append.append("    &InnerShell::store(\"" & d1 & "\", &InnerShell::getRegister(\"sra\"));")
     return to_append

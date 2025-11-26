@@ -29,7 +29,7 @@ GravityVM is a small, lightweight, memory/register based virtual machine that op
 	src
 	srd
 	sre
-	srnl (used for only for newline char | value should not be changed)
+	srnl (used for only for newline char | value should NOT be changed)
 
 ### Instructions: (NAME: OPCDE: [Arguments])
 	NOP:    00 [None, None, None]

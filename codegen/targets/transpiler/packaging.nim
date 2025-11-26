@@ -39,13 +39,21 @@ sub moveRegister {
     $STACK{$memory_location} = $REGISTERS{$register};
 }
 
+sub getRegister {
+    my $register = $_[0];
+    if (!exists $REGISTERS{$register}) {
+        print "<FATAL-Error>\n|> Reason: Invalid register location: " . $register . "\n";
+        die;
+    }
+    return $REGISTERS{$register};
+}
 
 
 1;
 """
 
 # OUTER SHELLING #
-var outershell_header: seq[string] = @["package OuterShell;\n", "require \"./" & packaging_location & "__packaging__/innershell.pm\";\n\n"]
+var outershell_header: seq[string] = @["package OuterShell;\n", "require \"./\".$ARGV[0].\"" & packaging_location & "__packaging__/innershell.pm\";\n\n"]
 var outershell*:string = outershell_header.join("\n") & """sub puts {
     my $d0 = $_[0];
     if (exists $InnerShell::STACK{$d0}) {

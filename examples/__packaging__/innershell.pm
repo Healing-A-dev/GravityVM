@@ -34,6 +34,14 @@ sub moveRegister {
     $STACK{$memory_location} = $REGISTERS{$register};
 }
 
+sub getRegister {
+    my $register = $_[0];
+    if (!exists $REGISTERS{$register}) {
+        print "<FATAL-Error>\n|> Reason: Invalid register location: " . $register . "\n";
+        die;
+    }
+    return $REGISTERS{$register};
+}
 
 
 1;

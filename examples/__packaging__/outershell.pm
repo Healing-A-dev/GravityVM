@@ -1,6 +1,6 @@
 package OuterShell;
 
-require "./__packaging__/innershell.pm";
+require "./".$ARGV[0]."__packaging__/innershell.pm";
 
 sub puts {
     my $d0 = $_[0];

@@ -4,7 +4,7 @@ import core/generation
 import core/cache
 import codegen/codegen
 
-# Argument parsing
+# Argument Parsing #
 let commands: seq[string] = commandLineParams()
 parseArgs(commands.len, commands)
 

@@ -66,14 +66,14 @@ proc processInstructions*(instructions: seq[string], file: string): int =
                 next.inc()
 
             # Instruction Failure
-            if OP[OPCODE](OPARGS[0], OPARGS[1], OPARGS[2]) != 0:
+            if OP[OPCODE]((OPARGS[0], OPARGS[1], OPARGS[2])) != 0:
                 echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
                 echo "|> Compilation Stopped!"
                 echo "|> Reason: " & OPERROR
                 echo "|\e[90m---------\e[0m> Instruction: " & instruction & ", " & OPCODE
                 echo "|> Where:"
                 echo "|\e[90m--------\e[0m> File: " & file
-                echo "|\e[90m--------\e[0m> Line: " & $((instruction_counter / 4) + 1)
+                echo "|\e[90m--------\e[0m> Instruction #: " & $((instruction_counter / 4) + 1)
                 return 2
 
             COMMAND.inc(4)
@@ -83,7 +83,7 @@ proc processInstructions*(instructions: seq[string], file: string): int =
             echo "|> Reason: Invalid instruction: " & instruction
             echo "|> Where:"
             echo "|\e[90m--------\e[0m> File: " & file
-            echo "|\e[90m--------\e[0m> Line: " & $((instruction_counter / 4) + 1)
+            echo "|\e[90m--------\e[0m> Instruction #: " & $((instruction_counter / 4) + 1)
             return 2
 
         instruction_counter.inc()
