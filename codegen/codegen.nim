@@ -8,7 +8,7 @@ import targets/transpiler/packaging
 import ../core/pattern
 
 # Instance Variables
-const c_version*: string = "0.0.1 +12"
+const c_version*: string = "0.0.1+12"
 type OPARGUMENTS* = tuple[memory_address: string, arg0: string, arg1: string]
 var
     c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] = vm_getTarget()
@@ -50,10 +50,8 @@ proc stripDir(file_path: string): string =
 
 proc C*(location: string, CMD: string, d0: string, d1: string, d2: string): int {.discardable.} =
     if not c_cmds.hasKey(CMD):
-        echo "\e[33mSERVERE:\e[0m Invalid or unimplemented opcode '" & CMD & "', falling back to perl transpilation."
-        #echo "|\e[90m--------\e[0m> Target: " & vm_target[]
-        #echo "|\e[90m--------\e[0m> Architecture: " & vm_architecture[]
         let commands: string = commandLineParams().join(" ") & " -f:perl"
+        echo "\e[31mSEVERE:\e[0m Invalid or unimplemented opcode '" & CMD & "', falling back to perl transpilation."
         echo "\e[92mHint:\e[0m ./gravity " & commands & " \e[96m[Fallback]\e[0m"
         discard execCmd("./gravity " & commands)
         quit()
@@ -155,45 +153,20 @@ proc C_generateASM*(): void =
 
 # Perl Generator
 proc C_generatePERL*(): void =
-    if c_output[c_output.len-3..c_output.len-1] != ".pl":
-        c_tmp = c_output & ".pl"
-    else:
-        c_tmp = c_output
-
+    c_tmp = c_output
     let c_out: File = open(c_tmp, fmWrite)
     defer: c_out.close()
 
-    # Create package folder to hold needed perl modules in
-    let perl_path: tuple = (c_output <?> stripDir(c_output))
-    let perl_directory: string = c_output[0..(perl_path.Region[0] - 1)]
-
-    try:
-        let inner: File = open(perl_directory & "__packaging__/innershell.pm", fmWrite)
-        inner.writeLine(innershell)
-        inner.close()
-        let outer: File = open(perl_directory & "__packaging__/outershell.pm", fmWrite)
-        outer.writeLine(outershell)
-        outer.close()
-    except IOError:
-        let status: int = execCmd("mkdir -p " & perl_directory & "__packaging__/")
-        let inner: File = open(perl_directory & "__packaging__/innershell.pm", fmWrite)
-        inner.writeLine(innershell)
-        inner.close()
-        let outer: File = open(perl_directory & "__packaging__/outershell.pm", fmWrite)
-        outer.writeLine(outershell)
-        outer.close()
-
     # Writing to file
-    c_out.writeLine("# Packaging")
-    c_out.writeLine("my $packagingPath = $ARGV[0];")
-    c_out.writeLine("require \"./\".$packagingPath.\"__packaging__/innershell.pm\";")
-    c_out.writeLine("require \"./\".$packagingPath.\"__packaging__/outershell.pm\";")
-    c_out.writeLine("# Program " & c_input)
-    c_out.writeLine("sub main {")
+    c_out.writeLine("#!/usr/bin/env perl\n")
+    c_out.writeLine(innershell)
+    c_out.writeLine(outershell)
+    c_out.writeLine("#---| File: " & c_input)
+    c_out.writeLine("sub _begin {")
     if c_data.len > 0:
         c_out.writeLine(c_data.join(""))
     c_out.writeLine(c_text.join(""))
-    c_out.writeLine("}\n&main();")
+    c_out.writeLine("}\n&_begin();")
 
 
 proc C_compile*(): int =
@@ -201,32 +174,44 @@ proc C_compile*(): int =
     var exit_code:int = 0
     var status: string = " \e[96m[" & $exit_code & "]\e[0m"
 
+    # Assembly
     exit_code = execCmd("as -o " & files[2] & " " & files[0])
     if exit_code != 0:
         status = " \e[91m[" & $exit_code & "]\e[0m"
     echo "\e[92mHint:\e[0m as -o " & files[2] & " " & files[0] & status
 
+    # Linking
     if exit_code == 0:
         exit_code = execCmd("ld -o " & files[1] & " " & files[2])
         if exit_code != 0:
                 status = " \e[91m[" & $exit_code & "]\e[0m"
         echo "\e[92mHint:\e[0m ld -o " & files[1] & " " & files[2] & status
 
+    # Cleanup
     if c_clean:
         files[1] = ""
-        discard execCmd("rm " & files.join(" "))
+        status = "\e[96m[Cleanup]\e[0m"
+        exit_code = execCmd("rm " & files.join(" "))
+        if exit_code != 0:
+            status = "\e[91m[Cleanup]\e[0m"
+        echo "\e[92mHint:\e[0m rm " & files.join(" ") & " " & status
 
     return exit_code
 
 
 proc C_run*(): void =
     if vm_target[] == "transpiler":
-        # file name stripper
-        assert (c_output <?> stripDir(c_output)).Region[0] >= 0
-        let end_of_path: int = (c_output <?> stripDir(c_output)).Region[0] - 1
-        let packaging_location: string = c_output[0..end_of_path]
-        echo "\e[92mHint:\e[0m perl " & c_tmp & " " & packaging_location & "\e[96m[Exec]\e[0m"
-        discard execCmd("perl " & c_tmp & " " & packaging_location)
+        var end_of_path: int = (c_output <?> stripDir(c_output)).Region[0] - 1
+        var packaging_location: string = c_output[0..end_of_path]
+
+        if end_of_path < 0:
+            end_of_path = c_output.len - 1
+
+        if packaging_location == c_output:
+            packaging_location = ""
+
+        echo "\e[92mHint:\e[0m ./" & c_tmp & " \e[96m[Exec]\e[0m"
+        discard execCmd("./" & c_tmp)
         return
 
     echo "\e[92mHint:\e[0m ./" & c_output & " \e[96m[Exec]\e[0m"
@@ -237,6 +222,7 @@ proc C_buildProgram*(instructions: seq[string], recompile: int = 1): tuple[ERRCO
     if c_transpile:
         if not c_debug and c_build:
             C_generatePERL()
+            discard execCmd("chmod +x " & c_output)
             if c_run:
                 C_run()
     else:

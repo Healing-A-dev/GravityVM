@@ -105,7 +105,10 @@ proc Store*(MEM_POOL: var Table[string, string], ADDR: var string, DATA: var str
     MEM_POOL[ADDR] = DATA
 
     if not ADDR.Increase() or MEM_POOL.len > MAX_SIZE:
-        echo "MEMORY OVERFLOW: '" & DATA & "' WAS NOT ADDED"
+        echo "\e[1mgravity: <\e[91mOVERFLOW-Error\e[0m\e[1m>\e[0m"
+        echo "|> Reason: Maximum memory pool size exceeded"
+        echo "|\e[90m--------\e[0m> Maximum size: " & $MAX_SIZE
+        echo "|\e[90m--------\e[0m> Current size: " & $MEM_POOL.len
         quit()
     return ADDR
 

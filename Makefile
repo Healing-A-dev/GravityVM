@@ -3,9 +3,7 @@ HINTS = --hints:off
 WARNINGS = -w:off
 CMD = nim
 
-
 .PHONY: exec
-
 
 compile: main.nim
 	printf '\033c'

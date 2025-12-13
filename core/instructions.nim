@@ -369,20 +369,24 @@ OP["MALLOC"] = proc(args: OPARGUMENTS): int =
     var data: string = ""
     var size_t: int = 0
     var args: tuple = args
+    var mem_type: string = ""
 
     case args.memory_address:
     of "@00":
         current_address = POOL_GLOBAL[].NextAddress()
         POOL_0 = POOL_GLOBAL
         MAX_SIZE = MAX_SIZE_GLOBAL
+        mem_type = "GLOBAL"
     of "$00":
         current_address = POOL_LOCAL[].NextAddress()
         POOL_0 = POOL_LOCAL
         MAX_SIZE = MAX_SIZE_LOCAL
+        mem_type = "LOCAL"
     of "%00":
         current_address = POOL_BUFFER[].NextAddress()
         POOL_0 = POOL_BUFFER
         MAX_SIZE = MAX_SIZE_BUFFER
+        mem_type = "BUFFER"
     else:
         OPERROR = "Invalid Memory Pool Address: '" & args.memory_address & "'"
         return 1
@@ -414,7 +418,7 @@ OP["MALLOC"] = proc(args: OPARGUMENTS): int =
         POOL_0[].Store(current_address, data, 3843)
 
     MAX_SIZE[] = POOL_0[].len
-    C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": MALLOC", "MALLOC", "[" & $size_t & " -> " & args.memory_address & "]")
+    C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": MALLOC", "MALLOC", "[" & $size_t & " -> " & mem_type & "]")
 
     return 0
 

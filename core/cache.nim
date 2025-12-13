@@ -64,13 +64,8 @@ proc generateData*(fname: string, instructions: seq[string]): int {.discardable.
     cacheData.add("(Start: Project")
     cacheData.add("    (Definition: Name => " & vm_file_out & ")")
     cacheData.add("    (Definition: File => \"" & fname & "\")")
-    cacheData.add("    (Definition: Identifier => " & generateHash(instructions) & ")")
-    cacheData.add("    (Class: ProjectData => (")
-    cacheData.add("        (Definition: Instructions => " & instruction_counter[0..<instruction_counter.len-2] & ")")
-    cacheData.add("        (Definition: Program => " & instructions.join("") & ")")
-    cacheData.add("        (Definition: Target => " & vm_execTarget & ")")
-    cacheData.add("    ))")
-    cacheData.add("    (Definition: CompilerVersion => \"" & vm_version & "\")")
+    cacheData.add("    (Definition: ProjectIdentifier => " & $vm_execTarget & "." & generateHash(instructions) & "." & $instructions.len & "-" & $instruction_counter & ")")
+    cacheData.add("    (Definition: CompilerVersion => " & vm_version & ")")
     cacheData.add("End: Project)")
     return 0
 

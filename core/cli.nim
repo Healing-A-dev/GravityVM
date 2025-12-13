@@ -8,7 +8,7 @@ var vm_file_in*: string = ""
 var vm_build*: bool = false
 var vm_run*: bool = false
 var vm_version*: string = c_version
-var vm_execTarget*: string = ""
+var vm_execTarget*: string = "native"
 
 
 proc join(list: seq[auto], sep: string = ""): string =
@@ -34,7 +34,7 @@ proc displayHelpMessage(): void =
         "  --version                  Display the current version of gravity",
         "  -i:[input_file]            Set the input file",
         "  -o:[output_file]           Set the output file <Optional>",
-        "  -f:[native|perl]           Force recompilation, ignoring the current cache file | Force perl transpilation instead of automatic compilation/transpilation",
+        "  -f:[native|perl]           Specify the format to compile to (native executable or perl) | Does not prevent automatic fallback to a working format",
         "  -w:[true (default)|false]  Set the warning state to either show (or not show) warnings",
         "  -intermediates:[true|false (default)]  Prevent clean-up after execution, keeping all intermediate files",
     ]

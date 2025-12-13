@@ -1,5 +1,5 @@
-# INNER SHELLING #
-const innershell*: string = """
+#!/usr/bin/env perl
+
 #---| Shelling for examples/test.gravity -> ./test
 #---| Creates a "virtual" environment to handle variables in
 #---| Attempts to catch any errors that may not have been caught preivously
@@ -46,10 +46,7 @@ sub getRegister {
     }
     return $REGISTERS{$register};
 }
-"""
 
-# OUTER SHELLING #
-var outershell*:string = """
 sub puts {
     my $d0 = $_[0];
     if (exists $STACK{$d0}) {
@@ -149,4 +146,79 @@ sub compare {
         &setRegister($d2, 1);
     }
 }
-"""
+
+#---| File: examples/guessing_game.gravity
+sub _begin {
+    &store("L02_gravityV", 100);
+    &store("L03_gravityV", "Girlfriend");
+    &store("L04_gravityV", 0);
+    &store("L05_gravityV", 5);
+    &store("L06_gravityV", "QUIT");
+    &store("L07_gravityV", "Quit");
+    &store("L08_gravityV", "quit");
+    &store("L09_gravityV", "nice");
+    &store("L10_gravityV", "bruh");
+    &store("L11_gravityV", "BRUH");
+    &store("L12_gravityV", "Bruh");
+    &store("L04_gravityV", 1);
+
+
+    lblDo_AGAIN:
+    &puts("Enter the correct name: ");
+    &read("L01_gravityV");
+    &compare("L01_gravityV", "L06_gravityV", "sra");
+    goto lblQUIT if ($REGISTERS{"sra"} == 0);
+    &compare("L01_gravityV", "L07_gravityV", "sra");
+    goto lblQUIT if ($REGISTERS{"sra"} == 0);
+    &compare("L01_gravityV", "L08_gravityV", "sra");
+    goto lblQUIT if ($REGISTERS{"sra"} == 0);
+    &compare("L01_gravityV", "L10_gravityV", "sra");
+    goto lblbruh if ($REGISTERS{"sra"} == 0);
+    &compare("L01_gravityV", "L11_gravityV", "sra");
+    goto lblbruh if ($REGISTERS{"sra"} == 0);
+    &compare("L01_gravityV", "L12_gravityV", "sra");
+    goto lblbruh if ($REGISTERS{"sra"} == 0);
+    &compare("L01_gravityV", "L09_gravityV", "sra");
+    goto lblnice if ($REGISTERS{"sra"} == 0);
+    &compare("L03_gravityV", "L01_gravityV", "sra");
+    goto lblWRONG if ($REGISTERS{"sra"} != 0);
+    &puts("Hello ");
+    &puts("\033[32m");
+    &puts("L01_gravityV");
+    &puts("\033[0m!");
+    &puts("\n");
+    &puts("\n");
+    &puts("-------------------------------\n");
+    &puts("Congraulations on guessing the correct name!\n");
+    &puts("Your prize is....NOTHINGGGG :D\n");
+    exit 0;
+
+    lblWRONG:
+    &puts("Incorrect Name: ");
+    &puts("\033[91m");
+    &puts("L01_gravityV");
+    &puts("\033[0m\n");
+    &add("L04_gravityV", 1, "sra");
+    &store("L04_gravityV", &getRegister("sra"));
+    &compare("L04_gravityV", "L05_gravityV", "sra");
+    goto lblHINT if ($REGISTERS{"sra"} == 0);
+    goto lblDo_AGAIN;
+
+    lblHINT:
+    &puts("Hint: Its the nickname of the creator of gravity :)");
+    goto lblDo_AGAIN;
+
+    lblQUIT:
+    &puts("Okay :)\n");
+    exit 69;
+
+    lblnice:
+    &puts("I know right\n");
+    goto lblDo_AGAIN;
+
+    lblbruh:
+    &puts("I'M SORRYYYYYY ;-;\n");
+    goto lblDo_AGAIN;
+
+}
+&_begin();

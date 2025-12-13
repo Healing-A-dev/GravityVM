@@ -44,15 +44,15 @@ vm_transpiler["STORE"] = proc(d0: string, d1: string, d2: string): string =
 
     case d0[0]
     of '@':
-        to_append.append("    &InnerShell::store(\"G" & d0[1..<d0.len] & "_gravityV\", " & d1 & ");")
+        to_append.append("    &store(\"G" & d0[1..<d0.len] & "_gravityV\", " & d1 & ");")
         to_append.append("    our $G" & d0[1..<d0.len] & "_gravityV = " & d1 & ";")
     of '$':
-        to_append.append("    &InnerShell::store(\"L" & d0[1..<d0.len] & "_gravityV\", " & d1 & ");")
+        to_append.append("    &store(\"L" & d0[1..<d0.len] & "_gravityV\", " & d1 & ");")
     of '%':
-        to_append.append("    &InnerShell::store(\"B" & d0[1..<d0.len] & "_gravityV\", " & d1 & ");")
+        to_append.append("    &store(\"B" & d0[1..<d0.len] & "_gravityV\", " & d1 & ");")
     of '[':
         let d2: string = d0[1..<d0.len - 1]
-        to_append.append("    &InnerShell::setRegister(\"" & d2 & "\", " & d1 & ");")
+        to_append.append("    &setRegister(\"" & d2 & "\", " & d1 & ");")
     else:
         return ""
 
@@ -76,7 +76,7 @@ vm_transpiler["READ"] = proc(d0: string, d1: string, d2: string): string =
     else:
         d0 = d0
 
-    to_append.append("    &OuterShell::read(\"" & d0 & "\");")
+    to_append.append("    &read(\"" & d0 & "\");")
     return to_append
 
 vm_transpiler["WRITE"] = proc(d0: string, d1: string, d2: string): string =
@@ -106,7 +106,7 @@ vm_transpiler["WRITE"] = proc(d0: string, d1: string, d2: string): string =
         echo "WIP"
         return ""
 
-    to_append.append("    &OuterShell::puts(" & d0 & ");")
+    to_append.append("    &puts(" & d0 & ");")
     return to_append
 
 
@@ -147,7 +147,7 @@ vm_transpiler["UPD"] = proc(d0: string, d1: string, d2: string): string =
     else:
         discard
 
-    to_append.append("    &OuterShell::update(" & d0 & ", " & d1 & ");")
+    to_append.append("    &update(" & d0 & ", " & d1 & ");")
     return to_append
 
 
@@ -162,9 +162,9 @@ vm_transpiler["ADD"] = proc(d0: string, d1: string, d2: string): string =
     if d1[d1.len-2..<d1.len] == ".0":
         d1 = d1[0..<d1.len-2]
 
-    to_append.append("    &OuterShell::add(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
+    to_append.append("    &add(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
     if d2 != "sra":
-        to_append.append("    &InnerShell::moveRegister(\"sra\", " & d2 & ");")
+        to_append.append("    &moveRegister(\"sra\", " & d2 & ");")
 
     return to_append
 
@@ -180,9 +180,9 @@ vm_transpiler["SUB"] = proc(d0: string, d1: string, d2: string): string =
     if d1[d1.len-2..<d1.len] == ".0":
         d1 = d1[0..<d1.len-2]
 
-    to_append.append("    &OuterShell::subt(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
+    to_append.append("    &subt(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
     if d2 != "sra":
-        to_append.append("    &InnerShell::moveRegister(\"sra\", " & d2 & ");")
+        to_append.append("    &moveRegister(\"sra\", " & d2 & ");")
 
     return to_append
 
@@ -198,9 +198,9 @@ vm_transpiler["MUL"] = proc(d0: string, d1: string, d2: string): string =
     if d1[d1.len-2..<d1.len] == ".0":
         d1 = d1[0..<d1.len-2]
 
-    to_append.append("    &OuterShell::mul(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
+    to_append.append("    &mul(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
     if d2 != "sra":
-        to_append.append("    &InnerShell::moveRegister(\"sra\", " & d2 & ");")
+        to_append.append("    &moveRegister(\"sra\", " & d2 & ");")
 
     return to_append
 
@@ -216,9 +216,9 @@ vm_transpiler["DIV"] = proc(d0: string, d1: string, d2: string): string =
     if d1[d1.len-2..<d1.len] == ".0":
         d1 = d1[0..<d1.len-2]
 
-    to_append.append("    &OuterShell::div(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
+    to_append.append("    &div(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
     if d2 != "sra":
-        to_append.append("    &InnerShell::moveRegister(\"sra\", " & d2 & ");")
+        to_append.append("    &moveRegister(\"sra\", " & d2 & ");")
 
     return to_append
 
@@ -234,9 +234,9 @@ vm_transpiler["EXP"] = proc(d0: string, d1: string, d2: string): string =
     if d1[d1.len-2..<d1.len] == ".0":
         d1 = d1[0..<d1.len-2]
 
-    to_append.append("    &OuterShell::exp(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
+    to_append.append("    &exp(" & d0 & ", " & d1 & ", \"" & d2 & "\");")
     if d2 != "sra":
-        to_append.append("    &InnerShell::moveRegister(\"sra\", " & d2 & ");")
+        to_append.append("    &moveRegister(\"sra\", " & d2 & ");")
 
     return to_append
 
@@ -249,7 +249,7 @@ vm_transpiler["COPY"] = proc(d0: string, d1: string, d2: string): string =
 
 vm_transpiler["LBL"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    to_append.append("lbl" & d0 & ":")
+    to_append.append("\n    lbl" & d0 & ":")
     return to_append
 
 
@@ -261,13 +261,13 @@ vm_transpiler["JMP"] = proc(d0: string, d1: string, d2: string): string =
 
 vm_transpiler["JNZ"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    to_append.append("    goto lbl" & d0 & " if ($InnerShell::REGISTERS{\"sra\"} != 0);")
+    to_append.append("    goto lbl" & d0 & " if ($REGISTERS{\"sra\"} != 0);")
     return to_append
 
 
 vm_transpiler["JEZ"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    to_append.append("    goto lbl" & d0 & " if ($InnerShell::REGISTERS{\"sra\"} == 0);")
+    to_append.append("    goto lbl" & d0 & " if ($REGISTERS{\"sra\"} == 0);")
     return to_append
 
 
@@ -300,7 +300,7 @@ vm_transpiler["CMP"] = proc(d0: string, d1: string, d2: string): string =
     else:
         discard
 
-    to_append.append("    &OuterShell::compare(\"" & d0 & "\", \"" & d1 & "\", \"sra\");")
+    to_append.append("    &compare(\"" & d0 & "\", \"" & d1 & "\", \"sra\");")
 
     return to_append
 
@@ -327,7 +327,7 @@ vm_transpiler["INC"] = proc(d0: string, d1: string, d2: string): string =
     else:
         discard
 
-    #to_append.append("    &InnerShell::setRegister(\"srb\", 1);")
-    to_append.append("    &OuterShell::add(\"" & d1 & "\", 1, \"sra\");")
-    to_append.append("    &InnerShell::store(\"" & d1 & "\", &InnerShell::getRegister(\"sra\"));")
+    #to_append.append("    &setRegister(\"srb\", 1);")
+    to_append.append("    &add(\"" & d1 & "\", 1, \"sra\");")
+    to_append.append("    &store(\"" & d1 & "\", &getRegister(\"sra\"));")
     return to_append
