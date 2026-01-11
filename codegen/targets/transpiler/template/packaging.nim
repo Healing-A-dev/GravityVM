@@ -29,3 +29,6 @@ const <LANGUAGE_NAME>_entry_end*: string = "" # OPTIONAL [unless entry_start is 
 # The function call to the entrypoint function defined earlier
 # ie. main()
 const <LANGUAGE_NAME>_entry_call*: string = "" # OPTIONAL [unless entry_start is defined]
+
+# The compiler name to be called when the program is built/ran
+const <LANGUAGE_NAME>_compiler*:string = "" # OPTIONAL [unless language is compiled or does not support being called from shebang]
