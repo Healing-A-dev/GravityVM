@@ -1,6 +1,7 @@
 import strutils
 import tables
 import instructions
+import cli
 
 proc generateInstructions*(file: string): seq[string] =
     let input: seq[string] = readFile(file).splitLines()
@@ -53,6 +54,14 @@ proc validateInstructions*(instructions: seq[string]): int =
 
 
 proc processInstructions*(instructions: seq[string], file: string): int =
+
+    if vm_debug:
+        type OPARGUMENTS = tuple[memory_address: string, arg0: string, arg1: string]
+        OP["FREE"] = proc(args: OPARGUMENTS): int =
+            return 0
+
+
+
     var COMMAND: int = 0
     while instruction_counter < instructions.len - 1:
         var instruction: string = instructions[instruction_counter]
@@ -67,23 +76,25 @@ proc processInstructions*(instructions: seq[string], file: string): int =
 
             # Instruction Failure
             if OP[OPCODE]((OPARGS[0], OPARGS[1], OPARGS[2])) != 0:
+                let instruction_number: string = $((instruction_counter / 4) + 1)
                 echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
                 echo "|> Compilation Stopped!"
                 echo "|> Reason: " & OPERROR
-                echo "|\e[90m---------\e[0m> Instruction: " & instruction & ", " & OPCODE
+                echo "|\e[90m---------\e[0m> Opcode: " & instruction & ", " & OPCODE
                 echo "|> Where:"
                 echo "|\e[90m--------\e[0m> File: " & file
-                echo "|\e[90m--------\e[0m> Instruction #: " & $((instruction_counter / 4) + 1)
+                echo "|\e[90m--------\e[0m> Instruction #: " & instruction_number[0..<(instruction_number.len - 2)]
                 return 2
 
             COMMAND.inc(4)
         elif not Instructions.hasKey(instruction) and instruction_counter == COMMAND:
+            let instruction_number: string = $((instruction_counter / 4) + 1)
             echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
             echo "|> Compilation Stopped!"
             echo "|> Reason: Invalid instruction: " & instruction
             echo "|> Where:"
             echo "|\e[90m--------\e[0m> File: " & file
-            echo "|\e[90m--------\e[0m> Instruction #: " & $((instruction_counter / 4) + 1)
+            echo "|\e[90m--------\e[0m> Instruction: " & instruction_number[0..<(instruction_number.len - 2)]
             return 2
 
         instruction_counter.inc()

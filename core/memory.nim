@@ -140,3 +140,7 @@ proc NextAddress*(MEM_POOL: Table[string, string]): string =
         if not ADDR.Increase():
             return ADDR # Maximum capcity reached
     return ADDR
+
+
+# Debug Info Collection
+var DebugInformation*: seq[string] = @[]

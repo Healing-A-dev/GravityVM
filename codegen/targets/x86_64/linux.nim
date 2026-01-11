@@ -47,7 +47,7 @@ x86_64_linux["__makeTemp"] = proc(d0: string, d1: string, d2: string): string =
 
 x86_64_linux["__comment"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
-    echo "\e[93mDEBUG\e[0m: [" & d1 & "]: " & d2
+    DebugInformation.add("    " & d1 & " => " & d2)
     return to_append.append("# " & d0)
 
 
@@ -62,11 +62,11 @@ x86_64_linux["STORE"] = proc(d0: string, d1: string, d2:string): string =
 
     case d0[0]
     of '@':
-        to_append.append("G" & d0[1..<d0.len] & "_gravityV: ")
+        to_append.append("G" & d0[1..<d0.len] & ": ")
     of '$':
-        to_append.append("L" & d0[1..<d0.len] & "_gravityV: ")
+        to_append.append("L" & d0[1..<d0.len] & ": ")
     of '%':
-        to_append.append("B" & d0[1..<d0.len] & "_gravityV: ")
+        to_append.append("B" & d0[1..<d0.len] & ": ")
     of '[':
         echo "Working on it"
     else:
@@ -105,20 +105,25 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
     var d1: string = d1
     var d2: string = d2
     var to_append: string = ""
+    var POOL_0: ref Table[string, string]
+    var POOL_1: ref Table[string, string]
 
     case d0[0]
     of '@':
-        d0 = "G" & d0[1..<d0.len] & "_gravityV"
+        d0 = "G" & d0[1..<d0.len] & ""
+        POOL_0 = POOL_GLOBAL
     of '$':
-        d0 = "L" & d0[1..<d0.len] & "_gravityV"
+        d0 = "L" & d0[1..<d0.len] & ""
+        POOL_0 = POOL_LOCAL
     of '%':
-        d0 = "B" & d0[1..<d0.len] & "_gravityV"
+        d0 = "B" & d0[1..<d0.len] & ""
+        POOL_0 = POOL_BUFFER
     of '[':
         let d3: string = d0[1..<(d0.len - 1)]
         if REGISTER.hasKey(d3):
             if REGISTER[d3] != "":
                 let count: int = write_storage.len
-                let variable_name: string = "T" & $count & "_gravityV"
+                let variable_name: string = "T" & $count & ""
                 try:
                     # Integers
                     discard parseInt(REGISTER[d3])
@@ -135,7 +140,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
                 d0 = variable_name
             else:
                 let count: int = write_storage.len
-                let variable_name: string = "T" & $count & "_gravityV"
+                let variable_name: string = "T" & $count & ""
                 try:
                     # Integers
                     discard parseInt(d3)
@@ -153,7 +158,7 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
                 d1 = $d3.len
         else:
             let count: int = write_storage.len
-            let variable_name: string = "T" & $count & "_gravityV"
+            let variable_name: string = "T" & $count & ""
             try:
                 # Integers
                 discard parseInt(d3)
@@ -262,6 +267,9 @@ x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string = ""): string =
             to_append.append("")
         except:
             # Strings
+            if d0[0] != 'T':
+                d1 = $POOL_0[][d0[1..2]].len
+
             to_append.append("    mov $1, %rax")
             to_append.append("    mov $1, %rdi")
             to_append.append("    mov $" & d0 & ", %rsi")
@@ -309,7 +317,7 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
             typing0 = "number"
         except:
             typing0 = "string"
-        d0 = "G" & d0[1..<d0.len] & "_gravityV"
+        d0 = "G" & d0[1..<d0.len] & ""
         POOL_0 = POOL_GLOBAL
     of '$':
         try:
@@ -317,7 +325,7 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
             typing0 = "number"
         except:
             typing0 = "string"
-        d0 = "L" & d0[1..<d0.len] & "_gravityV"
+        d0 = "L" & d0[1..<d0.len] & ""
         POOL_0 = POOL_LOCAL
     of '%':
         try:
@@ -325,7 +333,7 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
             typing0 = "number"
         except:
             typing0 = "string"
-        d0 = "B" & d0[1..<d0.len] & "_gravityV"
+        d0 = "B" & d0[1..<d0.len] & ""
         POOL_0 = POOL_BUFFER
     else:
         return ""
@@ -337,7 +345,7 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
                 typing1 = "number"
             except:
                 typing1 = "string"
-            d1 = "G" & d1[1..<d1.len] & "_gravityV"
+            d1 = "G" & d1[1..<d1.len] & ""
             POOL_1 = POOL_GLOBAL
         of '$':
             try:
@@ -345,7 +353,7 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
                 typing1 = "number"
             except:
                 typing1 = "string"
-            d1 = "L" & d1[1..<d1.len] & "_gravityV"
+            d1 = "L" & d1[1..<d1.len] & ""
             POOL_1 = POOL_LOCAL
         of '%':
             try:
@@ -353,7 +361,7 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
                 typing1 = "number"
             except:
                 typing1 = "string"
-            d1 = "B" & d1[1..<d1.len] & "_gravityV"
+            d1 = "B" & d1[1..<d1.len] & ""
             POOL_1 = POOL_BUFFER
         else:
             try:
@@ -369,12 +377,21 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
             if not needStrBuffer:
                 to_append.append("    mov $" & d1 & ", %rsi")
                 to_append.append("    mov $" & d0 & " + 0, %rdi")
-                to_append.append("    mov $" & $(POOL_1[][d1].len) & ", %rcx")
+                to_append.append("    mov $" & $(POOL_1[][d1[1..2]].len) & ", %rcx")
                 to_append.append("    cld")
-                to_append.append("    resp movsb")
+                to_append.append("    rep movsb")
+                POOL_0[][d0[1..2]] = POOL_1[][d1[1..2]]
             else:
-                echo "TODO: IMPLEMENT STR BUFFER STRING UPDATES"
-                #quit()
+                let count = write_storage.len
+                let variable_name: string = "T" & $count & ""
+                write_storage[variable_name] = variable_name & ":\n    .ascii \"" & d1[1..<(d1.len - 1)] & "\"\n    .byte 0"
+
+                to_append.append("    mov $" & variable_name & ", %rsi")
+                to_append.append("    mov $" & d0 & " + 0, %rdi")
+                to_append.append("    mov $" & $(d1[1..<(d1.len - 1)].len) & ", %rcx")
+                to_append.append("    cld")
+                to_append.append("    rep movsb")
+                POOL_0[][d0[1..2]] = d1[1..<(d1.len - 1)]
         of "number":
             var number: float = parseFloat(d1)
             var to_match: float = 0
@@ -384,7 +401,43 @@ x86_64_linux["UPD"] = proc(d0: string, d1: string, d2: string): string =
 
             to_append.append("    mov $" & $number & ", $[" & d0 & "]")
     else:
-        echo "TODO: IMPLEMENT: " & typing0 & " -> " & typing1 & "UPDATES"
+        echo "TODO: IMPLEMENT: " & typing0 & " -> " & typing1 & " UPDATES"
         quit()
+
+    return to_append
+
+
+x86_64_linux["ADD"] = proc(d0: string, d1: string, d2: string): string =
+    var to_append: string = ""
+    var d0: string = d0
+    var d1: string = d1
+    var d2: string = d2[2..<(d2.len - 1)] & "x"
+    var typing0: string = ""
+    var typing1: string = ""
+
+    # Register Adjusting
+    if d2 == "rex":
+        d2 = "r8"
+
+    # Value Typing
+    case d0[d0.len - 2..<(d0.len)]
+    of ".0":
+        typing0 = "int"
+        d0 = d0[0..<(d0.len - 2)]
+    else:
+        typing0 = "float"
+
+    case d1[d1.len - 2..<(d1.len)]
+    of ".0":
+        typing1 = "int"
+        d1 = d1[0..<(d1.len - 2)]
+    else:
+        typing1 = "float"
+
+    if typing0 == "int" and typing1 == "int":
+        to_append.append("    mov $" & d0 & ", %" & d2)
+        to_append.append("    mov $" & d1 & ", %rbx")
+        to_append.append("    add %" & d2 & ", %rbx")
+        to_append.append("")
 
     return to_append

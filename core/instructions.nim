@@ -91,7 +91,7 @@ OP["READ"] = proc(args: OPARGUMENTS): int =
         arg2 = args.memory_address[1..<args.memory_address.len]
         if not POOL_GLOBAL[].hasKey(arg2):
             OPERROR = "Invalid [Global] Memory Address: '" & arg2 & "'"
-            return 1
+            return 3
         POOL_GLOBAL[].Store(arg2, arg3, MAX_SIZE_GLOBAL[])
         C("TEXT", "READ", args.memory_address, "", "")
 
@@ -99,7 +99,7 @@ OP["READ"] = proc(args: OPARGUMENTS): int =
         arg2 = args.memory_address[1..<args.memory_address.len]
         if not POOL_LOCAL[].hasKey(arg2):
             OPERROR = "Invalid [Local] Memory Address: '" & arg2 & "'"
-            return 1
+            return 3
         POOL_LOCAL[].Store(arg2, arg3, MAX_SIZE_LOCAL[])
         C("TEXT", "READ", args.memory_address, "", "")
 
@@ -107,7 +107,7 @@ OP["READ"] = proc(args: OPARGUMENTS): int =
         arg2 = args.memory_address[1..<args.memory_address.len]
         if not POOL_BUFFER[].hasKey(arg2):
             OPERROR = "Invalid [Buffer] Memory Address: '" & arg2 & "'"
-            return 1
+            return 3
         POOL_BUFFER[].Store(arg2, arg3, MAX_SIZE_BUFFER[])
         C("TEXT", "READ", args.memory_address, "", "")
 
@@ -115,14 +115,15 @@ OP["READ"] = proc(args: OPARGUMENTS): int =
         arg2 = args.memory_address[1..<args.memory_address.len - 1]
         if not REGISTER.hasKey(arg2):
             OPERROR = "Invalid Memory Address Pointer: '" & arg2 & "'"
-            return 1
+            return 3
         REGISTER[args.memory_address] = "@STDIN@" & args.memory_address
         C("TEXT", "READ", args.memory_address, "", "")
 
     else:
         OPERROR = "Invalid Memory Location: '" & args.memory_address & "'"
-        return 1
+        return 3
 
+    C("TEXT", "__comment", "    instr_" & $(instruction_counter/4) & ": READ", "READ", args.memory_address)
     return 0
 
 
@@ -136,7 +137,7 @@ OP["WRITE"] = proc(args: OPARGUMENTS): int =
             data = POOL_GLOBAL[args.memory_address[1..<args.memory_address.len]]
         else:
             OPERROR = "Invalid [Global] Memory Address: '" & args.memory_address[1..<args.memory_address.len] & "'"
-            return 1
+            return 3
 
     of '[':
         data = args.memory_address[1..<(args.memory_address.len - 1)]
@@ -152,18 +153,18 @@ OP["WRITE"] = proc(args: OPARGUMENTS): int =
             data = POOL_LOCAL[args.memory_address[1..<args.memory_address.len]]
         else:
             OPERROR = "Invalid [Local] Memory Address: '" & args.memory_address[1..<args.memory_address.len] & "'"
-            return 1
+            return 3
 
     of '%':
             if POOL_BUFFER.hasKey(args.memory_address[1..<args.memory_address.len]):
                 data = POOL_BUFFER[args.memory_address[1..<args.memory_address.len]]
             else:
                 OPERROR = "Invalid [Buffer] Memory Address: '" & args.memory_address[1..<args.memory_address.len] & "'"
-                return 1
+                return 3
 
     else:
         OPERROR = "Invalid Memory Address Pointer: '" & args.memory_address & "'"
-        return 1
+        return 3
 
     C("TEXT", "__comment", "  instr_" & $(instruction_counter/4) & ": WRITE", "WRITE", args.memory_address)
     C("TEXT", "WRITE", args.memory_address, $data.len, $data)
@@ -225,10 +226,10 @@ OP["STORE"] = proc(args: OPARGUMENTS): int =
             REGISTER[register] = arg0
         else:
             OPERROR = "Invalid Register Location: '" & register & "'"
-            return 1
+            return 3
     else:
         OPERROR = "Invalid Memory Pointer: '" & memory_address[0] & "'"
-        return 1
+        return 3
 
 
 
@@ -256,7 +257,7 @@ OP["DEL"] = proc(args: OPARGUMENTS): int =
         POOL_BUFFER[].Remove(ADDR_BUFFER)
         C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": DEL", "DEL", "[" & ADDR_BUFFER & "]")
     else:
-        return 1
+        return 3
 
     return 0
 
@@ -290,10 +291,10 @@ OP["COPY"] = proc(args: OPARGUMENTS): int =
         args.arg0 = args.arg0[1..<(args.arg0.len - 1)]
         if not REGISTER.hasKey(args.arg0) or REGISTER[args.arg0] == "":
             OPERROR = "INVLIAD OR EMPTY REGISTER ADDRES " & args.arg0
-            return 1
+            return 3
         args.arg0 = REGISTER[args.arg0]
     else:
-        return 1
+        return 3
 
 
     # Update memory address
@@ -305,7 +306,7 @@ OP["COPY"] = proc(args: OPARGUMENTS): int =
                 POOL_GLOBAL[][args.memory_address[1..<args.memory_address.len]] = POOL_0[][args.arg0]
             else:
                 OPERROR = "Invalid [Global] Memory Address: '" & args.memory_address[1..<args.memory_address.len] & "'"
-                return 1
+                return 3
         else:
             C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": COPY", "COPY", "[" & $args.arg0.replace("\n","\\n") & " -> @" & args.memory_address[1..<args.memory_address.len] & "]")
             POOL_GLOBAL[][args.memory_address[1..<args.memory_address.len]] = args.arg0
@@ -317,7 +318,7 @@ OP["COPY"] = proc(args: OPARGUMENTS): int =
                 POOL_LOCAL[][args.memory_address[1..<args.memory_address.len]] = POOL_0[][args.arg0]
             else:
                 OPERROR = "Invalid [Local] Memory Address: '" & args.memory_address[1..<args.memory_address.len] & "'"
-                return 1
+                return 3
         else:
             C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": COPY", "COPY", "[" & $args.arg0.replace("\n","\\n") & " -> $" & args.memory_address[1..<args.memory_address.len] & "]")
             POOL_LOCAL[][args.memory_address[1..<args.memory_address.len]] = args.arg0
@@ -329,7 +330,7 @@ OP["COPY"] = proc(args: OPARGUMENTS): int =
                 POOL_BUFFER[][args.memory_address[1..<args.memory_address.len]] = POOL_0[][args.arg0]
             else:
                 OPERROR = "Invalid [Buffer] Memory Address: '" & args.memory_address[1..<args.memory_address.len] & "'"
-                return 1
+                return 3
         else:
             C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": COPY", "COPY", "[" & $args.arg0.replace("\n","\\n") & " -> %" & args.memory_address[1..<args.memory_address.len] & "]")
             POOL_BUFFER[][args.memory_address[1..<args.memory_address.len]] = args.arg0
@@ -340,10 +341,10 @@ OP["COPY"] = proc(args: OPARGUMENTS): int =
             REGISTER[args.memory_address[1..<(args.memory_address.len - 1)]] = args.arg0
         else:
             OPERROR = "Invalid [Register] Location: '" & args.memory_address[1..<args.memory_address.len] & "'"
-            return 1
+            return 3
         using_register = true
     else:
-        return 1
+        return 3
 
     if not using_register:
         if new_value:
@@ -351,9 +352,11 @@ OP["COPY"] = proc(args: OPARGUMENTS): int =
                 args.arg0 = args.arg0[1..<(args.arg0.len - 1)]
             C("DATA", "__comment", "  instr_" & $(instruction_counter/4) & ": STORE", "STORE", "[" & args.memory_address & "]")
             C("DATA", "STORE", args.memory_address, $args.arg0, "")
+            # C("TEXT", "UPD", args.memory_address, $args.arg0, "")
         else:
             C("DATA", "__comment", "  instr_" & $(instruction_counter/4) & ": STORE", "STORE", "[" & args.memory_address & "]")
             C("DATA", "STORE", args.memory_address, $POOL_0[args.arg0], "")
+            # C("TEXT", "UPD", args.memory_address, $POOL_0[args.arg0], "")
     else:
          C("TEXT", "STORE REGISTER", args.memory_address, $args.arg0,"")
 
@@ -389,7 +392,7 @@ OP["MALLOC"] = proc(args: OPARGUMENTS): int =
         mem_type = "BUFFER"
     else:
         OPERROR = "Invalid Memory Pool Address: '" & args.memory_address & "'"
-        return 1
+        return 3
 
     case args.arg0[0]:
     of '@':
@@ -408,7 +411,7 @@ OP["MALLOC"] = proc(args: OPARGUMENTS): int =
         discard
 
     if parseInt("" & args.arg0[0]) == 0:
-        size_t = parseInt("" & args.arg0[1])
+        size_t = parseInt("" & args.arg0[0])
     else:
         size_t = parseInt(args.arg0)
 
@@ -455,9 +458,9 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
             register0 = args.memory_address
         else:
             OPERROR = "Invalid or Empty Register Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Address to add
     case args.arg0[0]
@@ -476,9 +479,9 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
             register1 = args.arg0
         else:
             OPERROR = "Invalid or Empty Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Return Address/Register
     case args.arg1[0]
@@ -497,7 +500,7 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
             register2 = args.arg1
         else:
             OPERROR = "Invalid Register Address: '" & args.arg1 & "'"
-            return 1
+            return 3
     else:
         register2 = "[sra]"
 
@@ -515,17 +518,16 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
                     register00 = parseFloat(POOL_0[][args.memory_address])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][args.memory_address]) & " '" & POOL_1[][args.arg0] & "'"
-
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memeory Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
         try:
             register00 = parseFloat(REGISTER[register0])
         except ValueError as e:
             OPERROR = e.msg
-            return 1
+            return 3
 
     # Gathering Address/Register Data Slot1 #
     if register1 == "":
@@ -539,11 +541,12 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
                 else:
                     register10 = parseFloat(POOL_1[][args.arg0])
             except ValueError as e:
-                OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][args.arg0]) & " '" & POOL_1[][args.arg0] & "'"
-                return 1
+                if not (POOL_1[][args.arg0].contains("@STDIN@") and  POOL_1[][args.arg0].contains(args.arg0)):
+                    OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][args.arg0]) & " '" & POOL_1[][args.arg0] & "'"
+                    return 3
         else:
             OPERROR = "Invalid Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
         try:
             case REGISTER[register1][0]
@@ -555,7 +558,7 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
                 register10 = parseFloat(REGISTER[register1])
         except ValueError as e:
             OPERROR = "Invalid Float '" & REGISTER[register1] & "'"
-            return 1
+            return 3
 
     # Adding Values
     sum = $(register00 + register10)
@@ -570,13 +573,13 @@ OP["ADD"] = proc(args: OPARGUMENTS): int =
         var address: string = symbol & args.arg1
         var nop = ""
         if OP["COPY"]((address, sum, nop)) != 0:
-            return 1
+            return 3
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = sum
 
     C("VOID", "__comment", "  instr_" & $(instruction_counter/4) & ": ADD", "ADD", "[" & $register00 & " + " & $register10 & "]")
-    C("TEXT", "ADD", $register00, $register10, register2[1..<(register2.len - 1)])
+    C("TEXT", "ADD", $register00, $register10, register2)
     return 0
 
 
@@ -612,9 +615,9 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
             register0 = args.memory_address
         else:
             OPERROR = "Invalid or Empty Register Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Address to subtract
     case args.arg0[0]
@@ -633,9 +636,9 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
             register1 = args.arg0
         else:
             OPERROR = "Invalid or Empty Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Return Address/Register
     case args.arg1[0]
@@ -654,7 +657,7 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
             register2 = args.arg1
         else:
             OPERROR = "Invalid Register Address: '" & args.arg1 & "'"
-            return 1
+            return 3
     else:
         register2 = "[sra]"
 
@@ -673,16 +676,16 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][args.memory_address]) & " '" & POOL_1[][args.arg0] & "'"
 
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memeory Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
         try:
             register00 = parseFloat(REGISTER[register0])
         except ValueError as e:
             OPERROR = e.msg
-            return 1
+            return 3
 
     # Gathering Address/Register Data Slot1 #
     if register1 == "":
@@ -697,10 +700,10 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
                     register10 = parseFloat(POOL_1[][args.arg0])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][args.arg0]) & " '" & POOL_1[][args.arg0] & "'"
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
         try:
             case REGISTER[register1][0]
@@ -712,7 +715,7 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
                 register10 = parseFloat(REGISTER[register1])
         except ValueError as e:
             OPERROR = "Invalid Float '" & REGISTER[register1] & "'"
-            return 1
+            return 3
 
     # Subtracting Values
     difference = $(register00 - register10)
@@ -727,7 +730,7 @@ OP["SUB"] = proc(args: OPARGUMENTS): int =
         var address: string = symbol & args.arg1
         var nop = ""
         if OP["COPY"]((address, difference, nop)) != 0:
-            return 1
+            return 3
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = difference
@@ -769,9 +772,9 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
             register0 = args.memory_address
         else:
             OPERROR = "Invalid or Empty Register Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Address to multiply
     case args.arg0[0]
@@ -790,9 +793,9 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
             register1 = args.arg0
         else:
             OPERROR = "Invalid or Empty Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Return Address/Register
     case args.arg1[0]
@@ -811,7 +814,7 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
             register2 = args.arg1
         else:
             OPERROR = "Invalid Register Address: '" & args.arg1 & "'"
-            return 1
+            return 3
     else:
         register2 = "[sra]"
 
@@ -830,16 +833,16 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][args.memory_address]) & " '" & POOL_1[][args.arg0] & "'"
 
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memeory Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
         try:
             register00 = parseFloat(REGISTER[register0])
         except ValueError as e:
             OPERROR = e.msg
-            return 1
+            return 3
 
     # Gathering Address/Register Data Slot1 #
     if register1 == "":
@@ -854,10 +857,10 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
                     register10 = parseFloat(POOL_1[][args.arg0])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][args.arg0]) & " '" & POOL_1[][args.arg0] & "'"
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
         try:
             case REGISTER[register1][0]
@@ -869,7 +872,7 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
                 register10 = parseFloat(REGISTER[register1])
         except ValueError as e:
             OPERROR = "Invalid Float '" & REGISTER[register1] & "'"
-            return 1
+            return 3
 
     # Multiplying Values
     product = $(register00 * register10)
@@ -884,7 +887,7 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
         var address: string = symbol & args.arg1
         var nop = ""
         if OP["COPY"]((address, product, nop)) != 0:
-            return 1
+            return 3
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = product
@@ -926,9 +929,9 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             register0 = args.memory_address
         else:
             OPERROR = "Invalid or Empty Register Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Address to divide
     case args.arg0[0]
@@ -947,9 +950,9 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             register1 = args.arg0
         else:
             OPERROR = "Invalid or Empty Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Return Address/Register
     case args.arg1[0]
@@ -968,7 +971,7 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             register2 = args.arg1
         else:
             OPERROR = "Invalid Register Address: '" & args.arg1 & "'"
-            return 1
+            return 3
     else:
         register2 = "[sra]"
 
@@ -987,16 +990,16 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][args.memory_address]) & " '" & POOL_1[][args.arg0] & "'"
 
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memeory Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
         try:
             register00 = parseFloat(REGISTER[register0])
         except ValueError as e:
             OPERROR = e.msg
-            return 1
+            return 3
 
     # Gathering Address/Register Data Slot1 #
     if register1 == "":
@@ -1011,10 +1014,10 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
                     register10 = parseFloat(POOL_1[][args.arg0])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][args.arg0]) & " '" & POOL_1[][args.arg0] & "'"
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
         try:
             case REGISTER[register1][0]
@@ -1026,7 +1029,7 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
                 register10 = parseFloat(REGISTER[register1])
         except ValueError as e:
             OPERROR = "Invalid Float '" & REGISTER[register1] & "'"
-            return 1
+            return 3
 
     # Dividing Values
     quotient = $(register00 / register10)
@@ -1041,7 +1044,7 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
         var address: string = symbol & args.arg1
         var nop = ""
         if OP["COPY"]((address, quotient, nop)) != 0:
-            return 1
+            return 3
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = quotient
@@ -1083,9 +1086,9 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             register0 = args.memory_address
         else:
             OPERROR = "Invalid or Empty Register Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Address to do exponent stuff....
     case args.arg0[0]
@@ -1104,9 +1107,9 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             register1 = args.arg0
         else:
             OPERROR = "Invalid or Empty Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # Return Address/Register
     case args.arg1[0]
@@ -1125,7 +1128,7 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             register2 = args.arg1
         else:
             OPERROR = "Invalid Register Address: '" & args.arg1 & "'"
-            return 1
+            return 3
     else:
         register2 = "[sra]"
 
@@ -1144,16 +1147,16 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_0[][args.memory_address]) & " '" & POOL_1[][args.arg0] & "'"
 
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memeory Address: '" & args.memory_address & "'"
-            return 1
+            return 3
     else:
         try:
             register00 = parseFloat(REGISTER[register0])
         except ValueError as e:
             OPERROR = e.msg
-            return 1
+            return 3
 
     # Gathering Address/Register Data Slot1 #
     if register1 == "":
@@ -1168,10 +1171,10 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
                     register10 = parseFloat(POOL_1[][args.arg0])
             except ValueError as e:
                 OPERROR = "Attempt to perform arithmetic operation on " & $typeof(POOL_1[][args.arg0]) & " '" & POOL_1[][args.arg0] & "'"
-                return 1
+                return 3
         else:
             OPERROR = "Invalid Memory Address: '" & args.arg0 & "'"
-            return 1
+            return 3
     else:
         try:
             case REGISTER[register1][0]
@@ -1183,7 +1186,7 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
                 register10 = parseFloat(REGISTER[register1])
         except ValueError as e:
             OPERROR = "Invalid Float '" & REGISTER[register1] & "'"
-            return 1
+            return 3
 
     # Dividing Values
     power = $(register00 ^ register10)
@@ -1198,7 +1201,7 @@ OP["DIV"] = proc(args: OPARGUMENTS): int =
         var address: string = symbol & args.arg1
         var nop = ""
         if OP["COPY"]((address, power, nop)) != 0:
-            return 1
+            return 3
     else:
         var address: string = register2[1..<(register2.len - 1)]
         REGISTER[address] = power
@@ -1216,7 +1219,7 @@ OP["INC"] = proc(args: OPARGUMENTS): int =
     var nop: string = "00"
     var args: tuple = args
     #if OP["ADD"](memory_address, num, nop) != 0:
-        #return 1
+        #return 3
     case args.memory_address[0]
     of '@':
         value = call(POOL_GLOBAL, args.memory_address[1..<args.memory_address.len], "Global")
@@ -1229,13 +1232,13 @@ OP["INC"] = proc(args: OPARGUMENTS): int =
             value = REGISTER[args.memory_address[1..<args.memory_address.len - 1]]
     else:
         OPERROR = "Invalid Memory Address: '" & args.memory_address & "'"
-        return 1
+        return 3
 
     try:
         num_value = parseFloat(value)
     except ValueError as e:
         OPERROR = e.msg
-        return 1
+        return 3
 
     num_value = num_value + 1
     value = $num_value
@@ -1244,7 +1247,7 @@ OP["INC"] = proc(args: OPARGUMENTS): int =
         value = value[0..<value.len - 2]
 
 
-    discard OP["STORE"]((args.memory_address, value, nop))
+    # discard OP["STORE"]((args.memory_address, value, nop))
     C("TEXT", "__comment", "INC", "INC", args.memory_address)
     C("TEXT", "INC", args.memory_address, "", "")
 
@@ -1258,7 +1261,7 @@ OP["DEC"] = proc(args: OPARGUMENTS): int =
     var nop: string = "00"
     var args: tuple = args
     if OP["SUB"]((args.memory_address, num, nop)) != 0:
-        return 1
+        return 3
 
     return 0
 
@@ -1281,7 +1284,7 @@ OP["FREE"] = proc(args: OPARGUMENTS): int =
         ADDR_BUFFER.Zero()
     else:
         OPERROR = "INVALID MEMORY POOL ADDRESS: " & args.memory_address
-        return 1
+        return 3
 
     #C("TEXT", "FREE", "", "", "")
 
@@ -1309,9 +1312,9 @@ OP["UPD"] = proc(args: OPARGUMENTS): int =
             register0 = arg3
         else:
             OPERROR = "INVALID: " & args.memory_address
-            return 1
+            return 3
     else:
-        return 1
+        return 3
 
     # echo "UPDATE " & arg0
     C("VOID", "__comment", "UPD", "UPD", args.arg0 & " -> " & args.memory_address)
@@ -1337,18 +1340,18 @@ OP["LBL"] = proc(args: OPARGUMENTS): int =
             memory_address = memory_address[1..<memory_address.len - 1]
     else:
         OPERROR = "Invalid Memory Location: '" & memory_address & "'"
-        return 1
+        return 3
 
     if memory_address == "":
         OPERROR = "Value expected, got: " & memory_address
-        return 1
+        return 3
     elif $(typeof(memory_address)) != "string":
         OPERROR = "String value expected, got: " & $(typeof(memory_address))
-        return 1
+        return 3
 
     if LABELS.hasKey(memory_address):
         OPERROR = "Redefinition of label: '" & memory_address & "'"
-        return 1
+        return 3
 
     C("TEXT", "__comment", "LBL", "LBL", memory_address)
     C("TEXT", "LBL", memory_address, "", "")
@@ -1374,14 +1377,14 @@ OP["JMP"] = proc(args: OPARGUMENTS): int =
             memory_address = memory_address[1..<memory_address.len - 1]
     else:
         OPERROR = "Invalid Memory Location: '" & memory_address & "'"
-        return 1
+        return 3
 
     if memory_address == "":
         OPERROR = "Value expected, got: " & memory_address
-        return 1
+        return 3
     elif $(typeof(memory_address)) != "string":
         OPERROR = "String value expected, got: " & $(typeof(memory_address))
-        return 1
+        return 3
 
     C("TEXT", "__comment", "JMP", "JMP", memory_address)
     C("TEXT", "JMP", memory_address, "", "")
@@ -1406,14 +1409,14 @@ OP["JNZ"] = proc(args: OPARGUMENTS): int =
             memory_address = memory_address[1..<memory_address.len - 1]
     else:
         OPERROR = "Invalid Memory Location: '" & memory_address & "'"
-        return 1
+        return 3
 
     if memory_address == "":
         OPERROR = "Value expected, got: " & memory_address
-        return 1
+        return 3
     elif $(typeof(memory_address)) != "string":
         OPERROR = "String value expected, got: " & $(typeof(memory_address))
-        return 1
+        return 3
 
     C("TEXT", "__comment", "JNZ", "JNZ", memory_address)
     C("TEXT", "JNZ", memory_address, "", "")
@@ -1438,14 +1441,14 @@ OP["JEZ"] = proc(args: OPARGUMENTS): int =
             memory_address = memory_address[1..<memory_address.len - 1]
     else:
         OPERROR = "Invalid Memory Location: '" & memory_address & "'"
-        return 1
+        return 3
 
     if memory_address == "":
         OPERROR = "Value expected, got: " & memory_address
-        return 1
+        return 3
     elif $(typeof(memory_address)) != "string":
         OPERROR = "String value expected, got: " & $(typeof(memory_address))
-        return 1
+        return 3
 
     C("TEXT", "__comment", "JEZ", "JEZ", memory_address)
     C("TEXT", "JEZ", memory_address, "", "")
@@ -1464,10 +1467,10 @@ OP["CMP"] = proc(args: OPARGUMENTS): int =
     of '[':
         if not REGISTER.hasKey(args.memory_address[1..<args.memory_address.len - 1]):
             OPERROR = "Invalid Register Address: '" & args.memory_address[1..<args.memory_address.len - 1] & "'"
-            return 1
+            return 3
     else:
         OPERROR = "Invalid Memory Location: '" & args.memory_address & "'"
-        return 1
+        return 3
 
     case args.arg0[0]:
     of '@':
@@ -1479,10 +1482,10 @@ OP["CMP"] = proc(args: OPARGUMENTS): int =
     of '[':
         if not REGISTER.hasKey(args.arg0[1..<args.arg0.len - 1]):
             OPERROR = "Invalid Register Address: '" & args.arg0[1..<args.arg0.len - 1] & "'"
-            return 1
+            return 3
     else:
         OPERROR = "Invalid Memory Location: '" & args.arg0 & "'"
-        return 1
+        return 3
 
     C("TEXT", "__comment", "CMP", "CMP", args.memory_address & " == " & args.arg0)
     C("TEXT", "CMP", args.memory_address, args.arg0, "")
@@ -1514,7 +1517,7 @@ OP["EXIT"] = proc(args: OPARGUMENTS): int =
         discard parseInt(errcode)
     except ValueError as e:
         OPERROR = e.msg
-        return 1
+        return 3
 
     C("TEXT", "__comment", "EXIT", "EXIT", args.memory_address)
     C("TEXT", "EXIT", errcode, "", "")

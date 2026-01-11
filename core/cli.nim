@@ -30,13 +30,14 @@ proc displayHelpMessage(): void =
         "  build                  Compile the given bytecode file",
         "  run                    Compile and run the given bytecode file",
         "Options:",
-        "  --help                     Display this message and exit",
-        "  --version                  Display the current version of gravity",
-        "  -i:[input_file]            Set the input file",
-        "  -o:[output_file]           Set the output file <Optional>",
-        "  -f:[native|perl]           Specify the format to compile to (native executable or perl) | Does not prevent automatic fallback to a working format",
-        "  -w:[true (default)|false]  Set the warning state to either show (or not show) warnings",
-        "  -intermediates:[true|false (default)]  Prevent clean-up after execution, keeping all intermediate files",
+        "  --help                         Display this message and exit",
+        "  --version                      Display the current version of gravity",
+        "  -i:[input_file]                Set the input file",
+        "  -o:[output_file]               Set the output file <Optional>",
+        "  -b:[native|c|lua|js]           Specify the backend to compile/transpile to",
+        "  -f:[native|c|lua|js]           Specify the fallback language to recompile to if current language fails",
+        "  -w:[true|false]                Set the warning state to either show (or not show) warnings",
+        "  -intermediates:[true|false]    Prevent clean-up after execution, keeping all intermediate files",
     ]
     echo message_head & "\n" & message_body.join("\n")
     quit()
@@ -46,7 +47,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
     if argc == 0:
         displayHelpMessage()
     else:
-        for i in 0..(argc-1):
+        for i in 0..(argc - 1):
             var arg: string = argv[i]
             case arg[0]:
             of '-':
@@ -64,16 +65,52 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         vm_file_out = C_setOutputFile(fname_out)
                     vm_file_in = C_setInputFile(fname)
 
-                # Force Recompile
-                elif (arg == "f:native"):
-                    vm_recompile = C_setState("recompile", true)
-                    vm_execTarget = "native"
+                # Target Language
+                elif (arg[0..1] == "b:"):
+                    if arg.len < 3:
+                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                        echo "|> Reason: Language argument expected after -b:"
+                        quit()
+                    case arg[2..<(arg.len)]
+                    of "native":
+                        vm_recompile = C_setState("recompile", true)
+                        vm_execTarget = "native"
+                    of "c":
+                        vm_recompile = C_setState("recompile", true)
+                        vm_execTarget = "c"
+                        C_setTranspile(true, "c")
+                    of "lua":
+                        vm_recompile = C_setState("recompile", true)
+                        vm_execTarget = "lua"
+                        C_setTranspile(true, "lua")
+                    of "js":
+                        vm_recompile = C_setState("recompile", true)
+                        vm_execTarget = "javascript"
+                        C_setTranspile(true, "javascript")
+                    else:
+                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                        echo "|> Reason: Unsupported Language: " & arg[2..<(arg.len)]
+                        quit()
 
-                # Force Transpile
-                elif (arg == "f:perl"):
-                    vm_recompile = C_setState("recompile", true)
-                    vm_execTarget = "perl"
-                    C_setTranspile(true)
+                # Fallbacks
+                elif (arg[0..1] == "f:"):
+                    if arg.len < 3:
+                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                        echo "|> Reason: Language argument expected after -f:"
+                        quit()
+                    case arg[2..<(arg.len)]
+                    of "native":
+                        c_backup = "native"
+                    of "c":
+                        c_backup = "c"
+                    of "lua":
+                        c_backup = "lua"
+                    of "js":
+                        c_backup = "js"
+                    else:
+                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                        echo "|> Reason: Unsupported Language: " & arg[2..<(arg.len)]
+                        quit()
 
                 # Help Message
                 elif (arg == "-help"):

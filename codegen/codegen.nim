@@ -4,11 +4,15 @@ import strutils
 import osproc
 import os
 import targets/target
-import targets/transpiler/packaging
 import ../core/pattern
 
+# Language Packaging
+import targets/transpiler/lua/packaging
+import targets/transpiler/c/packaging
+import targets/transpiler/javascript/packaging
+
 # Instance Variables
-const c_version*: string = "0.0.1+12"
+const c_version*: string = "0.0.1+16"
 type OPARGUMENTS* = tuple[memory_address: string, arg0: string, arg1: string]
 var
     c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] = vm_getTarget()
@@ -26,6 +30,9 @@ var
     c_tmp: string = "out"
     c_build: bool = false
     c_run: bool = false
+    c_lang*: string = "native"
+    c_backup*: string = ""
+    c_c: string = ""
 
 
 # Directory Stripper
@@ -48,12 +55,34 @@ proc stripDir(file_path: string): string =
     return tmp.join("")
 
 
+proc fancyError(): void =
+    for pos, item in vm_languages[].pairs():
+        if vm_languages[][pos] == c_lang:
+            vm_languages[][pos] = "\e[91m\e[9m" & c_lang & "\e[0m"
+
+
+
+# Compiler OPCODE runner
+# Runs the given OPCODE and compiles it to given format
 proc C*(location: string, CMD: string, d0: string, d1: string, d2: string): int {.discardable.} =
     if not c_cmds.hasKey(CMD):
-        let commands: string = commandLineParams().join(" ") & " -f:perl"
-        echo "\e[31mSEVERE:\e[0m Invalid or unimplemented opcode '" & CMD & "', falling back to perl transpilation."
-        echo "\e[92mHint:\e[0m ./gravity " & commands & " \e[96m[Fallback]\e[0m"
-        discard execCmd("./gravity " & commands)
+        var commands: seq[string] = commandLineParams()
+        var to_run: bool = false
+        for pos, _ in commands.pairs():
+            if commands[pos].contains("-f:"):
+                to_run = true
+                commands[pos] = "-b:" & c_backup
+            elif commands[pos].contains("-b:"):
+                commands[pos] = ""
+        if to_run:
+            discard execCmd("./gravity " & commands.join(" "))
+            quit()
+
+        fancyError()
+        echo "\e[1mgravity: <\e[91mCOMPILE-Error\e[0m\e[1m>\e[0m"
+        echo "|> Reason: Invalid, unimplemented, or unsupported opcode '\e[91m" & CMD & "\e[0m'"
+        echo "|> Try -b: [" & vm_languages[].join(", ") & "] to build with a different backend"
+        echo "|> Try -f: [" & vm_languages[].join(", ") & "] to add a fallback backend"
         quit()
 
     case location
@@ -78,9 +107,10 @@ proc C_setInputFile*(file: string): string =
     c_input = file
     return file
 
-proc C_setTranspile*(state: bool = false): void =
-    c_cmds = vm_getTarget("transpiler", "transpiler")
+proc C_setTranspile*(state: bool = false, language: string = "c"): void =
+    c_cmds = vm_getTarget("transpiler", "transpiler", language)
     c_transpile = true
+    c_lang = language
 
 proc C_setDebug*(state: bool, init: bool = true): bool =
     if not state and not init:
@@ -151,26 +181,74 @@ proc C_generateASM*(): void =
         c_out.writeLine(c_rodata.join(""))
 
 
-# Perl Generator
-proc C_generatePERL*(): void =
+# Transpiler Code Generator
+proc C_transpile*(): void =
+    var setup: string = ""
+    var comment_char: string = ""
+    var entry_start: string = ""
+    var entry_end: string = ""
+    var entry_call: string = ""
     c_tmp = c_output
+
+    # Setting up transpiler environment
+    case c_lang
+    of "lua":
+        setup = lua_setup
+        comment_char = lua_comment_char
+        entry_start = lua_entry_start
+        entry_end = lua_entry_end
+        entry_call = lua_entry_call
+    of "c":
+        setup = c_setup
+        comment_char = c_comment_char
+        entry_start = c_entry_start
+        entry_end = c_entry_end
+        entry_call = c_entry_call
+        c_tmp = c_tmp & ".c"
+        c_c = c_compiler
+    of "javascript":
+        setup = js_setup
+        comment_char = js_comment_char
+        entry_start = js_entry_start
+        entry_end = js_entry_end
+        entry_call = js_entry_call
+        c_lang = "node"
+    else:
+        discard
+
+    # Generating output file
     let c_out: File = open(c_tmp, fmWrite)
     defer: c_out.close()
 
+    # Writing shebang
+    case c_lang
+    of "c":
+        discard
+    else:
+        c_out.writeLine("#!/usr/bin/env " & c_lang & "\n")
+
     # Writing to file
-    c_out.writeLine("#!/usr/bin/env perl\n")
-    c_out.writeLine(innershell)
-    c_out.writeLine(outershell)
-    c_out.writeLine("#---| File: " & c_input)
-    c_out.writeLine("sub _begin {")
+    c_out.writeLine(setup)
+    c_out.writeLine(comment_char & "--| File: " & c_input & " |--" & comment_char)
+    c_out.writeLine(entry_start)
     if c_data.len > 0:
         c_out.writeLine(c_data.join(""))
     c_out.writeLine(c_text.join(""))
-    c_out.writeLine("}\n&_begin();")
+    c_out.writeLine(c_cmds["__finalize"]("", "", ""))
+    c_out.writeLine(entry_end)
+
+    # Writing entrypoint function call
+    case c_lang:
+    of "c":
+        discard
+    else:
+        c_out.writeLine("")
+        c_out.writeLine(comment_char & "--| Entrypoint Call |--" & comment_char)
+        c_out.writeLine(entry_call)
 
 
 proc C_compile*(): int =
-    var files: seq[string] = @[c_tmp, c_output, c_output&".o"]
+    var files: seq[string] = @[c_tmp, c_output, c_output & ".o"]
     var exit_code:int = 0
     var status: string = " \e[96m[" & $exit_code & "]\e[0m"
 
@@ -178,14 +256,14 @@ proc C_compile*(): int =
     exit_code = execCmd("as -o " & files[2] & " " & files[0])
     if exit_code != 0:
         status = " \e[91m[" & $exit_code & "]\e[0m"
-    echo "\e[92mHint:\e[0m as -o " & files[2] & " " & files[0] & status
+    echo "as -o " & files[2] & " " & files[0] & status
 
     # Linking
     if exit_code == 0:
         exit_code = execCmd("ld -o " & files[1] & " " & files[2])
         if exit_code != 0:
                 status = " \e[91m[" & $exit_code & "]\e[0m"
-        echo "\e[92mHint:\e[0m ld -o " & files[1] & " " & files[2] & status
+        echo "ld -o " & files[1] & " " & files[2] & status
 
     # Cleanup
     if c_clean:
@@ -194,7 +272,7 @@ proc C_compile*(): int =
         exit_code = execCmd("rm " & files.join(" "))
         if exit_code != 0:
             status = "\e[91m[Cleanup]\e[0m"
-        echo "\e[92mHint:\e[0m rm " & files.join(" ") & " " & status
+        echo "rm " & files.join(" ") & " " & status
 
     return exit_code
 
@@ -210,19 +288,45 @@ proc C_run*(): void =
         if packaging_location == c_output:
             packaging_location = ""
 
-        echo "\e[92mHint:\e[0m ./" & c_tmp & " \e[96m[Exec]\e[0m"
+        echo "./" & c_tmp & " \e[96m[Exec]\e[0m"
         discard execCmd("./" & c_tmp)
         return
 
-    echo "\e[92mHint:\e[0m ./" & c_output & " \e[96m[Exec]\e[0m"
+    echo "./" & c_output & " \e[96m[Exec]\e[0m"
     discard execCmd("./" & c_output)
+
+
+proc buildC(compiler: string, output_command: string = "-o"): void =
+    if c_c == "":
+        return
+
+    var status: int = execCmd(compiler & " " & output_command & " " & c_output & " " & c_tmp)
+    var tag: string = "\e[96m[Exec]\e[0m"
+    if status != 0:
+        tag = "\e[91m[Exec]\e[0m"
+    echo compiler & " " & output_command & " " & c_output & " " & c_tmp & " " & tag
+
+    if c_clean:
+        tag = "\e[96m[Cleanup]\e[0m"
+        status = execCmd("rm " & c_tmp)
+        if status != 0:
+            tag = "\e[91m[Cleanup]\e[0m"
+        echo "rm " & c_tmp & " " & tag
+
+    c_tmp = c_tmp[0..<(c_tmp.len - 2)]
+
 
 
 proc C_buildProgram*(instructions: seq[string], recompile: int = 1): tuple[ERRCODE: int, Run: bool] =
     if c_transpile:
         if not c_debug and c_build:
-            C_generatePERL()
-            discard execCmd("chmod +x " & c_output)
+            if recompile != 0:
+                C_transpile()
+                buildC(c_c)
+                discard execCmd("chmod +x " & c_output)
+            else:
+                c_tmp = c_output
+
             if c_run:
                 C_run()
     else:
