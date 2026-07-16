@@ -110,8 +110,8 @@ let Instructions*: Table[string, string] = {
 
 # --- HELPERS ---
 
-# In Compile Mode, we largely ignore VM memory updates,
-# but we keep the structure valid so the interpreter logic remains intact if needed.
+# In Compile Mode, VM memory updates are largely ignored,
+# but I'll keep the structure valid so the interpreter logic remains intact if needed.
 proc storeResult(target: string, value: string): int =
     if not COMPILE_MODE:
         var dest = target
@@ -127,11 +127,9 @@ proc storeResult(target: string, value: string): int =
 proc getValue(loc: string): string =
     if loc == "": return "0"
     if not COMPILE_MODE:
-        # VM Mode: Fetch actual value
         if loc.startsWith("[") and loc.endsWith("]"):
             let reg = loc[1..^2]
             if REGISTER.hasKey(reg): return REGISTER[reg]
-        # (Add memory pool lookups here if full VM support is needed)
     return loc
 
 # --- OPCODES ---
@@ -153,47 +151,37 @@ OP["WRITE"] = proc(args: OPARGUMENTS): int =
     var data: string = "0"
     var rawAddr = args.memory_address
 
-    # 1. Handle String Literals ["String"]
     if rawAddr.startsWith("[\"") and rawAddr.endsWith("\"]"):
         data = rawAddr[2..^3].replace("\\n", "\n")
         C("TEXT", "__comment", "WRITE", "WRITE", data)
-        # Pass the literal directly to linux.nim
         C("TEXT", "WRITE", args.memory_address, $data.len, data)
         return 0
 
-    # 2. Handle Variables/Registers
     C("TEXT", "__comment", "WRITE", "WRITE", args.memory_address)
     C("TEXT", "WRITE", args.memory_address, "8", "")
     return 0
 
-# STORE (The most critical Opcode for Compilation)
+# STORE
 OP["STORE"] = proc(args: OPARGUMENTS): int =
     var dest = args.memory_address
     var src = args.arg0
 
-    # 1. Clean up Source (Resolve Registers)
     if src.startsWith("[") and src.endsWith("]"):
         src = src[1..^2]
         if REGISTER.hasKey(src): src = REGISTER[src]
         else: src = "[" & src & "]"
 
-    # 2. DETECT: Stack Variable (Always TEXT)
     if dest.contains("(%rbp)"):
         C("VOID", "__comment", "STORE", "STORE", src & " => " & dest)
         C("TEXT", "STORE", dest, src, "")
         return 0
 
-    # 3. DETECT: Force Text Assignment ("!" prefix)
-    # This comes from the Newton "03 !@var" trick
     if dest.startsWith("!"):
-        # We pass it to linux.nim (it will strip the '!' and emit 'mov')
         C("VOID", "__comment", "STORE", "STORE", src & " => " & dest)
         C("TEXT", "STORE", dest, src, "")
         return 0
 
-    # 4. Global Definition (Data Allocation)
     if dest.startsWith("@") or dest.startsWith("$") or dest.startsWith("%"):
-        # Assign Data to stored slots in gravity
         case dest[0]
         of '@':
           ADDR_BUFFER = dest[1..<dest.len]
@@ -219,7 +207,7 @@ OP["STORE"] = proc(args: OPARGUMENTS): int =
         C("TEXT", "STORE REGISTER", dest, src, "")
     return 0
 
-# UPD (Explicit Text Assignment)
+# UPD (UPDATE)
 OP["UPD"] = proc(args: OPARGUMENTS): int =
     C("VOID", "__comment", "UPDATE", "UPDATE", args.arg0 & " => " & args.memory_address)
     C("TEXT", "UPD", args.memory_address, args.arg0, "")
@@ -296,7 +284,6 @@ OP["GT"] = proc(args: OPARGUMENTS): int =
     C("TEXT", "GT", args.memory_address, args.arg0, args.arg1); return 0
 
 OP["LBL"] = proc(args: OPARGUMENTS): int =
-    # Ensure Labels are marked as TEXT so they don't drift into DATA
     C("TEXT", "__comment", "LBL", "LABEL", args.memory_address)
     C("TEXT", "LBL", args.memory_address, "", "")
     if not COMPILE_MODE:
@@ -355,10 +342,7 @@ OP["CALLD"] = proc(args: OPARGUMENTS): int =
     C("TEXT", "__comment", "CALLD", "CALL_DYNAMIC", args.arg1)
     C("TEXT", "CALLD", args.arg1, args.memory_address, args.arg0)
 
-    # VM Implementation (Interpreter Mode)
     if not COMPILE_MODE:
-        # Dynamic calls are complex to emulate in the interpreter right now.
-        # For now, we just warn the user if they try to run this without compiling.
         echo "Runtime Error: Dynamic Function Calls (Higher Order Functions) require Compilation."
         quit(1)
 
@@ -408,8 +392,6 @@ OP["EXIT"] = proc(args: OPARGUMENTS): int =
 
 # --- STRINGS ---
 OP["STR"] = proc(args: OPARGUMENTS): int =
-    # Emit "STR" to the transpiler (Gravity -> ASM)
-    # The transpiler will handle the .rodata switching
     C("DATA", "__comment", "STR", "STR", args.arg0 & " => " & args.memory_address)
     C("DATA", "STR", args.memory_address, args.arg0[1..(args.arg0.len - 2)], "")
     return 0
@@ -422,36 +404,27 @@ OP["WRITES"] = proc(args: OPARGUMENTS): int =
 
 # --- MAP OPERATIONS ---
 
-# NEWMAP [dest]
+# NEWMAP
 OP["NEWMAP"] = proc(args: OPARGUMENTS): int =
-    # 1. Compiler: Emit instruction
     C("TEXT", "__comment", "NEWMAP", "NEWMAP", args.memory_address)
     C("TEXT", "NEWMAP", args.memory_address, "", "")
 
-    # 2. Interpreter: Create Map and Store Reference
     if not COMPILE_MODE:
         map_counter.inc()
         let mapId = "MAP_" & $map_counter
 
-        # Initialize empty map in Heap
         HEAP_MAPS[mapId] = initTable[string, string]()
-
-        # Store the ID ("MAP_1") in the destination register
         discard storeResult(args.memory_address, mapId)
 
     return 0
 
-# MSET [mapRef] [key] [value]
+# MSET
 OP["MSET"] = proc(args: OPARGUMENTS): int =
-    # 1. Compiler
     C("TEXT", "__comment", "MSET", "MSET", args.memory_address & " => (Key = " & args.arg0 & ", Value = " & args.arg1 & ")")
     C("TEXT", "MSET", args.memory_address, args.arg0, args.arg1)
 
-    # 2. Interpreter
     if not COMPILE_MODE:
-        # Resolve the Map ID (e.g. "MAP_1") from the register
         let mapRef = getValue(args.memory_address)
-        # Resolve Key and Value
         let key = getValue(args.arg0)
         let val = getValue(args.arg1)
 
@@ -462,12 +435,10 @@ OP["MSET"] = proc(args: OPARGUMENTS): int =
 
     return 0
 
-# MGET [dest] [mapRef] [key]
+# MGET
 OP["MGET"] = proc(args: OPARGUMENTS): int =
-    # 1. Compiler
     C("TEXT", "MGET", args.memory_address, args.arg0, args.arg1)
 
-    # 2. Interpreter
     if not COMPILE_MODE:
         let mapRef = getValue(args.arg0)
         let key = getValue(args.arg1)
@@ -546,7 +517,6 @@ OP["ARGV"] = proc(args: OPARGUMENTS): int =
     return 0
 
 OP["CAT"] = proc(args: OPARGUMENTS): int =
-    # CAT [dest] [s1] [s2]
     C("TEXT", "CAT", args.memory_address, args.arg0, args.arg1)
     return 0
 
