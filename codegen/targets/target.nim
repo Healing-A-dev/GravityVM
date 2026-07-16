@@ -6,15 +6,19 @@ import aarch64/[linux, win64, darwin]
 # Language Transpilers
 import transpiler/lua/transpiler
 import transpiler/c/transpiler
-import transpiler/javascript/transpiler
+import transpiler/javascript/trasnpiler_new
+
+# --------------------- #
 
 var vm_target*: ref string
 var vm_system*: ref string
+var vm_isWin64_CPC*: ref bool
 var vm_architecture*: ref string
 var vm_languages*: ref seq[string]
 
 new(vm_target)
 new(vm_system)
+new(vm_isWin64_CPC)
 new(vm_architecture)
 new(vm_languages)
 
@@ -22,25 +26,28 @@ new(vm_languages)
 var vm_c = initTable[string, Table[string, Table[string, proc(d0: string, d1: string, d2: string): string]]]()
 var vm_t = initTable[string, proc(d0: string, d1: string, d2: string): string]()
 
-vm_c["x86_64"] = initTable[string, Table[string, proc(d0: string, d1: string, d2:string): string]]()
+vm_c["amd64"] = initTable[string, Table[string, proc(d0: string, d1: string, d2:string): string]]()
 vm_c["aarch64"] = initTable[string, Table[string, proc(d0: string, d1: string, d2:string): string]]()
 
-vm_c["x86_64"]["linux"] = x86_64_linux
-vm_c["x86_64"]["win64"] = x86_64_win64
-vm_c["x86_64"]["darwin"]  = x86_64_darwin
+vm_c["amd64"]["linux"] = x86_64_linux
+vm_c["amd64"]["win64"] = x86_64_win64
+vm_c["amd64"]["darwin"]  = x86_64_darwin
 
 vm_c["aarch64"]["linux"] = aarch64_linux
 vm_c["aarch64"]["win64"] = aarch64_win64
 vm_c["aarch64"]["darwin"] = aarch64_darwin
 
-vm_languages[] = @["c","lua","js"]
+vm_languages[] = @["native", "c", "js", "web-asm"]
+vm_isWin64_CPC[] = false
 
 
 proc vm_getTarget*(architecture: string = "", target: string = "", language: string = "lua"): Table[string, proc(d0: string, d1: string, d2: string): string] =
     # Collecting information about the system
-    vm_target[] = execCmdEx("uname").output
+    const hostSystem: string = hostOS
+    vm_target[] = hostOS
     vm_system[] = execCmdEx("uname -o").output
-    vm_architecture[] = execCmdEx("uname -m").output
+    vm_architecture[] = hostCPU
+
 
     # User defined compilation target/architecture
     if target != "":
@@ -58,6 +65,9 @@ proc vm_getTarget*(architecture: string = "", target: string = "", language: str
 
     if vm_c.hasKey(vm_architecture[]):
         if vm_c[vm_architecture[]].hasKey(vm_target[]):
+            if vm_target[] == "win64" or vm_target[] == "win32":
+                if vm_target[] != hostSystem:
+                    vm_isWin64_CPC[] = true
             return vm_c[vm_architecture[]][vm_target[]]
 
     # Transpiler languages

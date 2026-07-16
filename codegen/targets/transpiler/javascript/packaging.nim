@@ -8,12 +8,15 @@ let srb = 0;
 let src = 0;
 let srd = 0;
 let sre = 0;
+let srnl = "\n"
 
 function compare(x, y) {
     if (x == y) {
         sra = 0;
-    } else {
+    } else if (x > y) {
         sra = 1;
+    } else {
+        sra = 2;
     }
 }
 """

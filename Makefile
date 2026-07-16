@@ -1,17 +1,28 @@
-RELEASE = -d:debug
+CMD = nim
+RELEASE = -d:release
 HINTS = --hints:off
 WARNINGS = -w:off
 
-DESTDIR = /usr/local/bin
-CMD = nim
+
+INSTALL_DIR= /usr/local
+LIBRARY_DIR= /lib/gvm
+BINARY_DIR= /bin
+
+
+
+CXX = clang
+CFLAGS = -c -static -Wall -Wextra
+RUNTIME = lib/gvm_runtime.c
+RUNTIME_NAME = gvm.o
+
 
 .PHONY: compile
 
-compile: main.nim
+compile:
 	printf '\033c'
-	$(CMD) c $(RELEASE) $(HINTS) -o:gravity main.nim
+	$(CMD) c $(RELEASE) $(HINTS) -o:gvm main.nim
 	@printf '\033[92mCompilation Completed!\n\033[0m'
 
 build:
-	$(CMD) c $(RELEASE) $(HINTS) -o:gravity main.nim
-	sudo mv gravity $(DESTDIR)
+	$(CMD) c $(RELEASE) $(HINTS) -o:gvm main.nim
+	sudo mv gvm $(INSTALL_DIR)$(BINARY_DIR)
