@@ -5,12 +5,15 @@ local srb = 0
 local src = 0
 local srd = 0
 local sre = 0
+local srnl = "\n"
 
 local function compare(x, y)
     if x == y then
         sra = 0
-    else
+    elseif x > y then
         sra = 1
+    else
+        sra = 2
     end
 end
 """

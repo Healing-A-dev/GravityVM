@@ -29,8 +29,8 @@ var REGISTER*: Table[string, auto] = {
     "src": "",
     "srd": "",
     "sre": "",
-    "fhr": "",  # Not accessable threw normal means (internal for internal useage only)
-    "srnl": "\\n", # Not accessable threw normal means (internal for internal useage only)
+    "fhr": "",  # Not accessable through normal means (for internal useage only)
+    "srnl": "\\n", # Not accessable through normal means (for internal useage only)
 }.toTable()
 
 # Labels #
@@ -102,8 +102,9 @@ proc Size*(MEM_POOL: Table[string, string]): int =
 proc Store*(MEM_POOL: var Table[string, string], ADDR: var string, DATA: var string, MAX_SIZE: int): string {.discardable.} =
     if DATA.len >= 2 and DATA[0] == '[':
         DATA = DATA[1..<(DATA.len - 1)]
+    
     MEM_POOL[ADDR] = DATA
-
+    
     if not ADDR.Increase() or MEM_POOL.len > MAX_SIZE:
         echo "\e[1mgravity: <\e[91mOVERFLOW-Error\e[0m\e[1m>\e[0m"
         echo "|> Reason: Maximum memory pool size exceeded"
@@ -121,6 +122,7 @@ proc Remove*(MEM_POOL: var Table[string, string], ADDR: var string): string {.di
     MEM_POOL.del(ADDR)
     ADDR.Decrease()
     return ADDR
+
 
 
 # Clearing Mem. Pool
@@ -142,5 +144,47 @@ proc NextAddress*(MEM_POOL: Table[string, string]): string =
     return ADDR
 
 
+# Allocating Space
+proc Alloc*(MEM_POOL: var Table[string, string], Address: string, Amount: int, Type: string): void =
+    var
+      counter: int = 0
+      data: string = ""
+      max_size: int = 3843
+      address: string = Address
+    
+    while counter != Amount:
+      MEM_POOL.Store(address, data, max_size)
+      counter.inc()
+
+    case Type
+    of "global":
+      MAX_SIZE_GLOBAL[] = Amount
+    of "local":
+      MAX_SIZE_LOCAL[] = Amount
+    of "buffer":
+      MAX_SIZE_BUFFER[] = Amount
+
+    
+
+
 # Debug Info Collection
 var DebugInformation*: seq[string] = @[]
+var generateObjectFile*: bool = false
+
+# --- Stack Management ---
+var VALUE_STACK*: seq[string] = @[]
+var CALL_STACK*: seq[int] = @[]
+
+proc Push*(val: string) =
+  VALUE_STACK.add(val)
+
+proc Pop*(): string =
+  if VALUE_STACK.len == 0: return ""
+  result = VALUE_STACK[VALUE_STACK.len - 1]
+  VALUE_STACK.del(VALUE_STACK.len - 1)
+
+proc Peek*(offset: int): string =
+  let idx = VALUE_STACK.len - 1 - offset
+  if idx >= 0 and idx < VALUE_STACK.len:
+    return VALUE_STACK[idx]
+  return ""

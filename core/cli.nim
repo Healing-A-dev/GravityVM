@@ -1,15 +1,30 @@
 import ../codegen/codegen
+import ../codegen/targets/target
+import memory
 import pattern
+import os
+import strutils
 
-var vm_debug*: bool = C_setDebug(false)
-var vm_recompile*: bool = false
-var vm_file_out*: string = ""
-var vm_file_in*: string = ""
-var vm_build*: bool = false
-var vm_run*: bool = false
-var vm_version*: string = c_version
-var vm_execTarget*: string = "native"
+var
+    vm_debug*: bool = C_setDebug(false)
+    vm_recompile*: bool = false
+    vm_file_out*: string = ""
+    vm_file_in*: string = ""
+    vm_build*: bool = false
+    vm_run*: bool = false
+    vm_version*: string = c_version
+    vm_execTarget*: string = "native"
+    vm_execPlatform*: string = ""
+    vm_linkerfiles*: seq[string] = @[]
+    vm_generateObjectFile*: bool
 
+let BACKENDS: seq[string] = vm_languages[]
+
+const TARGETS: seq[string] = @[
+  "linux64",
+  "win64",
+  "darwin",
+]
 
 proc join(list: seq[auto], sep: string = ""): string =
     let length: int = list.len-1
@@ -23,21 +38,31 @@ proc join(list: seq[auto], sep: string = ""): string =
 
 
 proc displayHelpMessage(): void =
-    const message_head: string = "Usage: gravity <command> <options?>"
+    const message_head: string = "Gravity Virtual Machine\n---------------------------\nUsage: gvm <command> <options> <flags>\n"
     const message_body: seq[string] = @[
         "Commands:",
         "  disassemble            Disassembles the given file and displays each intruction",
         "  build                  Compile the given bytecode file",
         "  run                    Compile and run the given bytecode file",
+        "  generate-object        Compile the given bytecode file to an object file",
+        "  clean-cache            Removes all cached information from the cache directory",
+        "",
         "Options:",
-        "  --help                         Display this message and exit",
-        "  --version                      Display the current version of gravity",
-        "  -i:[input_file]                Set the input file",
-        "  -o:[output_file]               Set the output file <Optional>",
-        "  -b:[native|c|lua|js]           Specify the backend to compile/transpile to",
-        "  -f:[native|c|lua|js]           Specify the fallback language to recompile to if current language fails",
-        "  -w:[true|false]                Set the warning state to either show (or not show) warnings",
-        "  -intermediates:[true|false]    Prevent clean-up after execution, keeping all intermediate files",
+        "  -i: | <input_file>              Specify the input file",
+        "  -o: | <output_file>             Specify the output file <Optional>",
+        "  -b: | <language>                Specify the language to compile/transpile to",
+        "  -f: | <language>                Specify the fallback language to recompile to",
+        "  -w: | <true|false>              Set the warning state to either show (or not show) warnings",
+        "  -L: | <path/to/file>            Specify a file to link with (can be used more than once)",
+        "  -P: | <platform>                Specify the target platform",
+        "  -verbose: | <true|false>        Set the verbosity of the virtual machine <Default: false>",
+        "  -intermediates: | <true|false>  Prevent clean-up after execution, keeping all intermediate files <Default: false>",
+        "",
+        "Flags:",
+        "  --help                 Display this message and exit",
+        "  --version              Display the current version of gravity",
+        "  --targets              Display all available compilation langauges/targets",
+        "  --platforms            Display all available platforms",
     ]
     echo message_head & "\n" & message_body.join("\n")
     quit()
@@ -112,6 +137,24 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         echo "|> Reason: Unsupported Language: " & arg[2..<(arg.len)]
                         quit()
 
+                # Linker Files
+                elif (arg[0..1] == "L:"):
+                    if arg.len < 3:
+                       echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                       echo "|> Reason: Language argument expected after -L:"
+                       quit()
+                    let file: string = arg[2..<(arg.len)]
+                    c_linkerfiles.add(file)
+                    vm_linkerfiles.add(file)
+
+                # Target Platform
+                elif (arg[0..1] == "P:"):
+                    if arg.len < 3:
+                      echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                      echo "|> Reason: Language argument expected after -L:"
+                    let platform: string = arg[2..<(arg.len)]
+                    C_setPlatform("amd64", platform)
+
                 # Help Message
                 elif (arg == "-help"):
                     displayHelpMessage()
@@ -127,10 +170,31 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
 
                 # Version
                 elif (arg == "-version"):
-                    echo "GravityVM (gravity): "
+                    echo "\e[1mgravity: \e[0m"
                     echo "|> Version: " & c_version
                     echo "|> Lisence: MIT 2025"
                     quit()
+
+                # Langauges
+                elif (arg == "-targets"):
+                    echo "Available Compilation Targets:"
+                    for target in BACKENDS:
+                      echo " > " & target
+                    quit()
+
+                # Platforms
+                elif (arg == "-platforms"):
+                    echo "Supported Platforms:"
+                    for platform in TARGETS:
+                      echo " > " & platform
+                    quit()
+
+                # Verbose
+                elif (arg == "verbose:true"):
+                    c_verbose = true
+
+                elif (arg == "verbose:fale"):
+                    c_verbose = false
 
                 # Warnings
                 elif (arg == "w:true"):
@@ -154,6 +218,19 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
             of "run":
                 vm_build = C_setState("build", true)
                 vm_run = C_setState("run", true)
+            of "generate-object":
+                generateObjectFile = true
+                c_generateObjectFile = true
+                vm_generateObjectFile = true
+                vm_build = C_setState("build", true)
+            of "clean-cache":
+                const homedir: string = getEnv("HOME")
+                const gvmdir: string = homedir / ".cache" / "GravityVM"
+                for kind, name in  walkDir(gvmdir):
+                    if $kind == "pcFile" and not name.endsWith(".config"):
+                        removeFile(name)
+                echo "\e[1mCache Cleared!\e[0m"
+                quit()
             else:
                 echo "gravity: invalid command: " & argv[0]
                 displayHelpMessage()

@@ -5,6 +5,17 @@ import osproc
 import os
 
 var cacheData: seq[string] = @[]
+const homeDirectory: string = getEnv("HOME")
+const gravityDirectory: string = homeDirectory / ".cache" / "GravityVM"
+var CONFIG: seq[string]
+var MAX_ENTRIES: int
+var COMPARE_CACHE: int
+
+proc loadCacheConfig*(): void =
+    CONFIG = readFile(gravityDirectory / ".config").splitLines()
+    MAX_ENTRIES = parseInt(CONFIG[0].replace("MAX_ENTRIES = ", ""))
+    COMPARE_CACHE = parseInt(CONFIG[1].replace("COMPARE_CACHE = ", ""))
+
 
 # Directory Stripper
 proc stripDir(file_path: string ): string =
@@ -32,7 +43,9 @@ proc indexCache(directory: string): tuple[Count: int, Files: seq[string]] =
         var kind: string = $kind
         if kind == "pcFile":
             files.add(name)
-    return (Count: files.len, Files: files)
+
+    # Subtracting 1 from the count to compensate for the .config file
+    return (Count: files.len - 1, Files: files)
 
 
 proc generateHash(str: seq[string]): string =
@@ -60,55 +73,78 @@ proc generateHash(str: seq[string]): string =
 
 
 proc generateData*(fname: string, instructions: seq[string]): int {.discardable.} =
+    var vm_execTargetI = vm_execTarget
+    if vm_generateObjectFile == true:
+        vm_execTargetI = "object"
     let instruction_counter: string = $(instructions.len / 4)
     cacheData.add("(Start: Project")
-    cacheData.add("    (Definition: Name => " & vm_file_out & ")")
+    cacheData.add("    (Definition: Name => \"" & vm_file_out & "\")")
     cacheData.add("    (Definition: File => \"" & fname & "\")")
     cacheData.add("    (Definition: ProjectIdentifier => " & $vm_execTarget & "." & generateHash(instructions) & "." & $instructions.len & "-" & $instruction_counter & ")")
     cacheData.add("    (Definition: CompilerVersion => " & vm_version & ")")
+    cacheData.add("    (Definition: LinkerFiles => @" & vm_linkerfiles.join(", @") & ")")
     cacheData.add("End: Project)")
     return 0
 
 
 proc writeCache*(file_path: string): int {.discardable.} =
     let file_location: tuple = (file_path <?> stripDir(file_path))
-    var directory: string = file_path[0..(file_location.Region[0] - 1)]
-    let cache_index: tuple = indexCache(directory & ".g_cache")
+    var directory: string = ""
+    let cache_index: tuple = indexCache(gravityDirectory)
 
-    if cache_index.Count + 1 == 2:
+    # Automatically clean cache if over the allowed limit
+    if cache_index.Count + 1 > MAX_ENTRIES:
         for file in cache_index.Files:
-            removeFile(file)
+            if not file.contains("/.config"):
+                try:
+                    removeFile(file)
+                except IOError as e:
+                    echo "[Warning] failed to remove file: " & file
+                    echo "|----> Info: " & e.msg
 
     try:
-        let file: File = open("./" & directory & ".g_cache/" & file_location.Pattern & ".script", fmWrite)
+        let file: File = open(gravityDirectory / file_location.Pattern & ".script", fmWrite)
         for item in cacheData:
             file.writeLine(item)
         file.close()
     except IOError:
-        let status: int = execCmd("mkdir " & directory & ".g_cache/")
-        if status != 0:
-            return status
-        let file: File = open("./" & directory & ".g_cache/" & file_location.Pattern & ".script", fmWrite)
+        let status: int = execCmd("mkdir -p " & gravityDirectory)
+        if status != 0: return status
+        let file: File = open(gravityDirectory / file_location.Pattern & ".script", fmWrite)
         for item in cacheData:
             file.writeLine(item)
         file.close()
-
     return 0
 
 
 proc compareCache*(file_path: string): int =
+    # Skip entire check if not comparing cache
+    # Reason for implementing this is because the current way the cache works
+    # IF a cache file is found (and is the same as the one generated for the new file) -> Check for already compiled executable
+    # This is a major security problem because it will blindly run any executable that is the same name as the expected output (if an executable of the same name is found)
+    # --------------------------------------------------- #
+    # TODO: Implement a different cache comparison system #
+    # --------------------------------------------------- #
+    if COMPARE_CACHE == 0:
+        return 1
+
+    # Cache Comparison
     let file_location: tuple = (file_path <?> stripDir(file_path))
-    var directory: string = file_path[0..(file_location.Region[0] - 1)]
+    var cmpProjectID: bool = false
     try:
-        let cache: seq[string] = readFile("./" & directory & ".g_cache/" & file_location.Pattern & ".script").splitLines()
+        let cache: seq[string] = readFile(gravityDirectory / file_location.Pattern & ".script").splitLines()
         var out_file: string = ""
+        var fsize: int = 0
         for position, item in cache.pairs():
             if position < cacheData.len and cacheData[position] != item:
                 return 1
             elif position < cacheData.len and cacheData[position].contains("(Definition: Name =>"):
                 out_file = (cacheData[position] <?> vm_file_out).Pattern
+            elif position < cacheData.len and cacheData[position].contains("(Definition: ProjectIdentifier =>"):
+                if cache[position] == cacheData[position]:
+                    cmpProjectID = true
 
-        if fileExists(out_file):
+        if fileExists(out_file) and cmpProjectID:
             return 0
         else:
             return 1
