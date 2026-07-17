@@ -4,11 +4,9 @@ HINTS = --hints:off
 WARNINGS = -w:off
 
 
-INSTALL_DIR= /usr/local
+INSTALL_DIR= $(HOME)/.local
 LIBRARY_DIR= /lib/gvm
 BINARY_DIR= /bin
-
-
 
 CXX = clang
 CFLAGS = -c -static -Wall -Wextra
@@ -25,4 +23,4 @@ compile:
 
 build:
 	$(CMD) c $(RELEASE) $(HINTS) -o:gvm main.nim
-	sudo mv gvm $(INSTALL_DIR)$(BINARY_DIR)
+	mv gvm $(INSTALL_DIR)$(BINARY_DIR)
