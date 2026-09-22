@@ -24,4 +24,4 @@ compile:
 
 build:
 	$(CMD) c $(RELEASE) $(HINTS) -o:gvm main.nim
-	mv gvm $(INSTALL_DIR)$(BINARY_DIR)
+	mv gvm $(INSTALL_DIR)$(BINARY_DIR)/
