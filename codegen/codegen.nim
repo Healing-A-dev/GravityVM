@@ -246,82 +246,82 @@ proc C_transpile*(): void =
 proc C_compile*(): int =
     var files: seq[string] = @[c_tmp, c_output, c_output & ".o"]
     var exit_code:int = 0
-    var status: string = " \e[96m[" & $exit_code & "]\e[0m"
+    var status: string = "\e[32m[Assemble]\e[0m "
 
     # Win64 Compilation (Cross Platform Compilation | ie. Linux -> Windows)
     if vm_isWin64_CPC[]:
 
-      exit_code = execCmd("x86_64-w64-mingw32-as -o " & files[2] & " " & files[0])
+      exit_code = execCmd("x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2")
       if exit_code != 0:
-        status = " \e[91m[" & $exit_code & "]\e[0m"
+        status = "\e[91m[Assemble]\e[0m "
       if c_verbose:
-        echo "x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & status
+        echo status & "x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2"
 
       # Linking (mingw32-gcc)
       if exit_code == 0 and not c_generateObjectFile:
         exit_code = execCmd("x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32 -lbcrypt -lmswsock")
-        status = "\e[96m[Link]\e[0m"
+        status = "\e[32m[Link]\e[0m "
         if exit_code != 0:
-          status = " \e[91m[Link]\e[0m"
+          status = "\e[91m[Link]\e[0m "
         if c_verbose:
-          echo "x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32"
+          echo status & "x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32"
 
     # Win64 Compilation (Same Platform Compilation | ie. Windows -> Windows)
     elif not vm_isWin64_CPC[] and vm_target[] == "windows":
 
-      exit_code = execCmd("as -o " & files[2] & " " & files[0])
+      exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
       if exit_code != 0:
-        status = " \e[91m[" & $exit_code & "]\e[0m"
+        status = "\e[91m[Assemble]\e[0m "
       if c_verbose:
-        echo "as -o " & files[2] & " " & files[0] & status
+        echo status & "as -o " & files[2] & " " & files[0] & " -O2"
 
       # Linking (gcc)
       if exit_code == 0 and not c_generateObjectFile:
         exit_code = execCmd("gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32")
-        status = "\e[96m[Link]\e[0m"
+        status = "\e[32m[Link]\e[0m "
         if exit_code != 0:
-          status = " \e[91m[Link]\e[0m"
+          status = " \e[91m[Link]\e[0m "
         if c_verbose:
-          echo "gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32"
+          echo status & "gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32"
 
     # Linux/MacOS
     else:
       if c_generateObjectFile: files[2] = "_" & files[2]
-      exit_code = execCmd("as -o " & files[2] & " " & files[0])
+      exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
       if exit_code != 0:
-          status = " \e[91m[" & $exit_code & "]\e[0m"
+          status = "\e[91m[Assemble]\e[0m "
       if c_verbose:
-          echo "as -o " & files[2] & " " & files[0] & status
+          echo status & "as -o " & files[2] & " " & files[0] & " -O2"
 
       # Linking
       if exit_code == 0 and not c_generateObjectFile:
           exit_code = execCmd("ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
-          status = "\e[96m[Link]\e[0m"
+          status = "\e[32m[Link]\e[0m "
           if exit_code != 0:
-              status = " \e[91m[Link]\e[0m"
+              status = "\e[91m[Link]\e[0m "
           if c_verbose:
-              echo "ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ") & " " & status
+              echo status & "ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
       if exit_code == 0 and c_generateObjectFile:
         exit_code = execCmd("ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" "))
-        status = "\e[96m[Link->Object]\e[0m"
+        status = "\e[32m[Link->Object]\e[0m "
         if exit_code != 0:
-            status = " \e[91m[Link->Object]\e[0m"
+            status = "\e[91m[Link->Object]\e[0m "
         if c_verbose:
-            echo "ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" ") & " " & status
+            echo status & "ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" ")
 
     # Cleanup
     if c_clean:
         if c_generateObjectFile:
             files[2] = ""
         files[1] = ""
-        status = "\e[96m[Cleanup]\e[0m"
+        status = "\e[32m[Cleanup]\e[0m "
         exit_code = execCmd("rm " & files.join(" "))
         if exit_code != 0:
-            status = "\e[91m[Cleanup]\e[0m"
+            status = "\e[91m[Cleanup]\e[0m "
 
         if c_verbose:
-            echo "rm " & files.join(" ") & " " & status
+            echo status & "rm " & files.join(" ")
 
     return exit_code
 
@@ -336,13 +336,13 @@ proc C_run*(): int =
 
         if packaging_location == c_output:
             packaging_location = ""
-            
+
         if c_verbose:
-            echo "./" & c_tmp & " \e[96m[Exec]\e[0m"
+            echo "\e[32m[Exec]\e[0m ./" & c_tmp
         discard execCmd("./" & c_tmp)
         return
     if c_verbose:
-        echo "./" & c_output & " \e[96m[Exec]\e[0m"
+        echo "\e[32m[Exec]\e[0m ./" & c_output
     return execCmd("./" & c_output)
 
 

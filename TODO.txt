@@ -1,11 +1,12 @@
 TODO:
-* Finish Perl Interpreter (HIGH PRIORITY) *
-* Finish ASM Compiler (ALL PLATFORMS) *
+* Finish Perl TRANSPILER (HIGH PRIORITY) *
+* Finish ASM Compiler (ALL PLATFORMS) [LINUX: DONE]*
 
 -------------------------------------------
 * Create ASM targets
-* Fix floats only print the first digit after the decimal correctly
-* Implement remaining OPCODES
+* Fix floats only print the first digit after the decimal correctly [DONE]
+* Implement remaining OPCODES [DONE]
+* 
 * Fix INC/DEC
 * Create gravity logo
 * Create a better README

@@ -119,7 +119,7 @@ proc writeCache*(file_path: string): int {.discardable.} =
 
 proc compareCache*(file_path: string): int =
     # Skip entire check if not comparing cache
-    # Reason for implementing this is because the current way the cache works
+    # Reason for implementing this is because of the current way the cache works
     # IF a cache file is found (and is the same as the one generated for the new file) -> Check for already compiled executable
     # This is a major security problem because it will blindly run any executable that is the same name as the expected output (if an executable of the same name is found)
     # --------------------------------------------------- #

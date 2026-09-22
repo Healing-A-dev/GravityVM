@@ -226,6 +226,7 @@ x86_64_win64["FSTORE"] = proc(d0, d1, d2: string): string = return setSection(".
 x86_64_win64["NOP"] = proc(d0: string, d1: string, d2: string): string = return "    nop\n"
 x86_64_win64["__required"] = proc(d0: string, d1: string, d2: string): string = return ""
 x86_64_win64["__makeTemp"] = proc(d0: string, d1: string, d2: string): string = return ""
+x86_64_win64["__finalize"] = proc(d0: string, d1: string, d2: string): string = return ""
 x86_64_win64["__comment"] = proc(d0: string, d1: string, d2: string): string = return "    # " & d0
 x86_64_win64["MOV"] = proc(d0, d1, d2: string): string = return load(d1, resolve(d0))
 x86_64_win64["NSUB"] = proc(d0, d1, d2: string): string =

@@ -604,6 +604,7 @@ x86_64_linux["NET_RECV"] = proc(d0, d1, d2: string): string =
 x86_64_linux["NOP"] = proc(d0: string, d1: string, d2: string): string = return "    nop\n"
 x86_64_linux["__required"] = proc(d0: string, d1: string, d2: string): string = return ""
 x86_64_linux["__makeTemp"] = proc(d0: string, d1: string, d2: string): string = return ""
+x86_64_linux["__finalize"] = proc(d0: string, d1: string, d2: string): string = return ""
 x86_64_linux["__comment"] = proc(d0: string, d1: string, d2: string): string =
     var to_append: string = ""
     DebugInformation.add("    " & d1 & ": " & d2)

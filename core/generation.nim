@@ -10,20 +10,20 @@ proc decodeOpcode(val: uint8): string =
   var res = ""
   if v == 0:
       return "00"
-      
+
   while v > 0:
     let rem = v mod 36
     if rem < 10: res.add(chr(rem + ord('0')))
     else: res.add(chr(rem - 10 + ord('A')))
     v = v div 36
-    
+
   for i in 0 ..< res.len div 2:
     swap(res[i], res[res.len - 1 - i])
-    
+
   while res.len < 2:
     res = "0" & res
   return res
-  
+
 proc collectProperInstructionSize(size: int): string =
     let diff_size: int = size mod 4
     return $(size-diff_size)
@@ -31,20 +31,20 @@ proc collectProperInstructionSize(size: int): string =
 proc generateInstructions*(file: string): seq[string] =
     var instructions: seq[string] = @[]
     var strm = newFileStream(file, fmRead)
-    
+
     if strm.isNil:
         echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
         echo "|> Reason: Could not file <", file, ">"
         quit(1)
-        
+
     defer: strm.close()
 
     let magic = strm.readStr(3)
     let version = strm.readUint8()
-    
+
     if magic != "GVM":
         echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
-        echo "|> Reason: Not a valid Newton binary."
+        echo "|> Reason: Not a valid GravityVM binary."
         quit(1)
 
     let instructionCount = strm.readUint32()
@@ -59,7 +59,7 @@ proc generateInstructions*(file: string): seq[string] =
             instructions.add(argStr)
 
     return instructions
-    
+
 proc validateInstructions*(instructions: seq[string]): int =
     if instructions.len mod 4 != 0:
         echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"

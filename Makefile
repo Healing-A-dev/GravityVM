@@ -1,6 +1,7 @@
 CMD = nim
 RELEASE = -d:release
-HINTS = --hints:off
+HINTS = --hints:on
+HINTS = --hints:on
 WARNINGS = -w:off
 
 
