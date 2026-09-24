@@ -12,6 +12,10 @@ var MAX_ENTRIES: int
 var COMPARE_CACHE: int
 
 proc loadCacheConfig*(): void =
+    if not fileExists(gravityDirectory / ".config"):
+        let file = open(gravityDirectory / ".config", fmWrite)
+        defer: close(file)
+        file.write("MAX_ENTRIES = 9\nCOMPARE_CACHE = 0")
     CONFIG = readFile(gravityDirectory / ".config").splitLines()
     MAX_ENTRIES = parseInt(CONFIG[0].replace("MAX_ENTRIES = ", ""))
     COMPARE_CACHE = parseInt(CONFIG[1].replace("COMPARE_CACHE = ", ""))

@@ -45,7 +45,7 @@ proc vm_getTarget*(architecture: string = "", target: string = "", language: str
     # Collecting information about the system
     const hostSystem: string = hostOS
     vm_target[] = hostOS
-    vm_system[] = execCmdEx("uname -o").output
+    vm_system[] = hostSystem
     vm_architecture[] = hostCPU
 
 
