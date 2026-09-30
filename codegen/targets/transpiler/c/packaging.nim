@@ -31,7 +31,6 @@ char** global_argv;
 long long gvm_int_to_str(long long val);
 
 // Runtime Functions
-// --- STRINGS ---
 long long gvm_str_cat(long long s1, long long s2) {
     char* str1;
     char* str2;
@@ -58,8 +57,6 @@ long long gvm_str_cat(long long s1, long long s2) {
     return (long long)dest;
 }
 
-// --- FILE I/O ---
-// --- Runtime: File I/O --- //
 long long gvm_file_open(long long path, long long mode) {
     long long real_mode = UNTAG(mode);
     char* mode_str = "r"; // Always default to read for safety
@@ -148,8 +145,6 @@ void gvm_net_close(long long fd) {
     close((int)fd);
 }
 
-// --- NEWTON MAPS ---
-// --- NEWTON MAPS & DYNAMIC TYPES ---
 typedef struct MapNode {
     long long key;
     long long val;
@@ -241,7 +236,6 @@ void gvm_map_del(long long map_ptr, long long key) {
     }
 }
 
-// --- TYPES & CONVERSIONS ---
 long long gvm_typeof(long long val) {
     if (val & 1) {
         __attribute__((aligned(8))) static const char int_str[] = "int";
@@ -264,7 +258,6 @@ long long gvm_int_to_str(long long val) {
     return (long long)buffer;
 }
 
-// --- SYSTEM-ARGS ---
 long long gvm_get_argv(long long index) {
     long long idx = index >> 1; // Untag
     if (idx >= 0 && idx < global_argc) {
@@ -275,10 +268,6 @@ long long gvm_get_argv(long long index) {
 """
 
 const c_runtime_labels: string = """
-    // ==========================================
-    // --- NEWTON STANDARD LIBRARY C-RUNTIME ---
-    // ==========================================
-    // --- Math Runtime ---
     runtime_add:
         sra = TAG(UNTAG(srb) + UNTAG(src));
         goto *(void*)stack[rsp++]; // Only pop return address!
@@ -341,11 +330,6 @@ runtime_eq:
         fprintf(stderr, "%s\n", (char*)srb);
         goto *(void*)stack[rsp++];
 
-
-    // ==========================================
-    // --- MISSING SYSTEM & FILE I/O RUNTIME ----
-    // ==========================================
-
     read_file:
         sra = gvm_file_read_all(srb);
         goto *(void*)stack[rsp++];
@@ -372,10 +356,6 @@ runtime_eq:
         goto *(void*)stack[rsp++];
     }
 
-    // ==========================================
-    // --- MISSING PROCESS MANAGEMENT RUNTIME ---
-    // ==========================================
-
     sys_fork:
         sra = TAG(fork());
         goto *(void*)stack[rsp++];
@@ -399,10 +379,6 @@ runtime_eq:
         // Executes a shell command (srb = command string)
         sra = TAG(system((char*)srb));
         goto *(void*)stack[rsp++];
-
-    // ==========================================
-    // --- MISSING NETWORKING RUNTIME ---
-    // ==========================================
 
     runtime_net_create:
         sra = TAG(socket(AF_INET, SOCK_STREAM, 0));
@@ -452,10 +428,6 @@ runtime_eq:
         goto *(void*)stack[rsp++];
     }
 
-    // ==========================================
-    // --- MISSING MATH & LOGIC RUNTIME ---
-    // ==========================================
-
     runtime_or:
         sra = ((srb != 0) || (src != 0)) ? 1 : 0;
         goto *(void*)stack[rsp++];
@@ -491,10 +463,6 @@ runtime_eq:
         sra = TAG(rand() % UNTAG(srb));
         goto *(void*)stack[rsp++];
 
-    // ==========================================
-    // --- MISSING DATA STRUCTURE RUNTIME ---
-    // ==========================================
-
 new_array: {
     long long cap = UNTAG(srb);
     // Allocate block: [Capacity] [Count] [Element 0] [Element 1] ...
@@ -510,7 +478,6 @@ collection_set: {
     long long index = UNTAG(src);
     long long* elements = block + 2; // Skip metadata
     elements[index] = srd;
-    // Automatically grow the length tracker when new items are added!
     if (index >= block[1]) {
         block[1] = index + 1;
     }
@@ -525,9 +492,6 @@ collection_get: {
     goto *(void*)stack[rsp++];
 }
 
-// ==========================================
-// --- MISSING TYPE CASTING RUNTIME ---
-// ==========================================
 newton_box_float: {
     // Allocate heap space for float to prevent tag collision
     double* box = malloc(sizeof(double));

@@ -170,6 +170,10 @@ x86_64_win64["CMP"] = proc(d0, d1, d2: string): string =
     if d2 != "" and d2 != "00": s.add("    mov %rax, " & resolve(d2) & "\n")
     return s
 
+x86_64_win64["EXPO"] = proc(d0, d1, d2: string): string =
+    let lbl: string = d0.replace("[","").replace("]","")
+    return ".global " & lbl & "\n"
+
 x86_64_win64["WRITE"] = proc(d0: string, d1: string, d2: string): string =
     if d0.startsWith("[\"") and d0.endsWith("\"]"):
         let lbl = "str_" & $rodata_counter

@@ -22,6 +22,7 @@ var
     c_void: seq[string] = @[]
     c_bss: seq[string] = @[]
     c_linkerfiles*: seq[string] = @[]
+    c_runarguments*: seq[string] = @[]
     c_debug: bool = true
     c_clean: bool = true
     c_input*: string = ""
@@ -339,11 +340,11 @@ proc C_run*(): int =
 
         if c_verbose:
             echo "\e[32m[Exec]\e[0m ./" & c_tmp
-        discard execCmd("./" & c_tmp)
+        discard execCmd("./" & c_tmp & " " & c_runarguments.join(" "))
         return
     if c_verbose:
         echo "\e[32m[Exec]\e[0m ./" & c_output
-    return execCmd("./" & c_output)
+    return execCmd("./" & c_output & " " & c_runarguments.join(" "))
 
 
 proc buildC(compiler: string, output_command: string = "-o"): void =

@@ -222,6 +222,7 @@ x86_64_linux["LT"] = proc(d0: string, d1: string, d2: string): string =
     let lblTrue = getUniqueLabel("lt_true")
     let lblDone = getUniqueLabel("lt_done")
     var s = setSection(".text")
+
     s.add("    mov " & resolve(d0) & ", %rax\n")
     s.add("    cmp " & resolve(d1) & ", %rax\n")
     s.add("    jl " & lblTrue & "\n")
@@ -237,13 +238,17 @@ x86_64_linux["GT"] = proc(d0: string, d1: string, d2: string): string =
     let lblTrue = getUniqueLabel("gt_true")
     let lblDone = getUniqueLabel("gt_done")
     var s = setSection(".text")
+
     s.add("    mov " & resolve(d0) & ", %rax\n")
     s.add("    cmp " & resolve(d1) & ", %rax\n")
     s.add("    jg " & lblTrue & "\n")
+
     s.add("    mov $1, %rax\n")
     s.add("    jmp " & lblDone & "\n")
+
     s.add(lblTrue & ":\n")
     s.add("    mov $3, %rax\n")
+
     s.add(lblDone & ":\n")
     s.add("    mov %rax, " & resolve(d2) & "\n")
     return s

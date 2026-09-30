@@ -51,7 +51,6 @@ vm_transpiler_c["LBL"] = proc(d0, d1, d2: string): string =
 
     var s = lbl & ":\n"
     if lbl.startsWith("F_"):
-        # Standard function prologue mapped to the C stack
         s &= "    stack[--rsp] = rbp;\n    rbp = rsp;\n"
     else:
         current_label = lbl
@@ -98,16 +97,9 @@ vm_transpiler_c["GETARG"] = proc(d0, d1, d2: string): string =
     let offset = 2 + index
     return "    " & resolveC(d0) & " = stack[rbp + " & $offset & "];\n"
 
-
-# ==========================================
-# --- 2. Arithmetic & Logic (Inlined) ---
-# ==========================================
-
 vm_transpiler_c["STORE"] = proc(d0, d1, d2: string): string =
     var dest = resolveC(d0)
     var src = resolveC(d1)
-
-    # If it's a Global, a Branch label, or a generic Register, declare it statically
     if dest.startsWith("G_") or dest.startsWith("B_") or dest.startsWith("reg_"):
         return "    static long long " & dest & " = 0;\n    " & dest & " = " & src & ";\n"
 
@@ -142,11 +134,6 @@ vm_transpiler_c["GT"] = proc(d0, d1, d2: string): string =
 vm_transpiler_c["EQ"] = proc(d0, d1, d2: string): string =
     return "    sra = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 1 : 0;\n"
 
-
-# ==========================================
-# --- 3. Branching & Variables ---
-# ==========================================
-
 vm_transpiler_c["JMP"] = proc(d0, d1, d2: string): string =
     return "    goto " & d0.replace("[", "").replace("]", "") & ";\n"
 
@@ -162,14 +149,8 @@ vm_transpiler_c["STR"] = proc(d0, d1, d2: string): string =
     if hex.len > 0:
         for i in countup(0, hex.len - 2, 2):
             bytes.add("\\x" & hex[i..i+1])
-
     let label = d0.replace("$", "").replace("!", "").replace("[", "").replace("]", "")
-
-    # Generate a standard C global char array
     return "    static const char " & label & "[] = \"" & bytes & "\";\n"
-# ==========================================
-# --- 4. Hardware/Runtime Calls ---
-# ==========================================
 
 vm_transpiler_c["NEWMAP"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d0) & " = gvm_map_new();\n"
@@ -191,7 +172,6 @@ vm_transpiler_c["EXIT"] = proc(d0, d1, d2: string): string =
         return "    exit(UNTAG(" & resolveC(d0) & "));\n"
     return ""
 
-# --- Memory Allocation & Copying ---
 vm_transpiler_c["MALLOC"] = proc(d0, d1, d2: string): string = return "    // [MALLOC]\n"
 
 vm_transpiler_c["FREE"] = proc(d0, d1, d2: string): string =
@@ -200,7 +180,6 @@ vm_transpiler_c["FREE"] = proc(d0, d1, d2: string): string =
 vm_transpiler_c["COPY"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d1) & " = " & resolveC(d0) & ";\n"
 
-# --- Typing ---
 vm_transpiler_c["ITS"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d0) & " = gvm_int_to_str(" & resolveC(d1) & ");\n"
 
@@ -280,7 +259,6 @@ vm_transpiler_c["UPD"] = proc(d0, d1, d2: string): string =
 vm_transpiler_c["CALLD"] = proc(d0, d1, d2: string): string =
     let retLabel = getUniqueLabel("RET_ADDR")
     var s = "    stack[--rsp] = (long long)&&" & retLabel & ";\n"
-    # Dereference and jump to the function pointer
     s &= "    goto *(void*)" & resolveC(d1) & ";\n"
     s &= retLabel & ":\n"
 
@@ -292,12 +270,10 @@ vm_transpiler_c["CALLD"] = proc(d0, d1, d2: string): string =
     return s
 
 vm_transpiler_c["EXPO"] = proc(d0, d1, d2: string): string =
-    # C handles global scope natively, so we just comment it for debugging
     return "    // EXPORT " & d0.replace("[", "").replace("]", "") & "\n"
 
 vm_transpiler_c["ETRN"] = proc(d0, d1, d2: string): string =
     var s = "    // FFI SHIELD\n"
-    # Call the external function and immediately tag the return value
     let funcName = d0.replace("[", "").replace("]", "")
     s &= "    sra = ((long long)" & funcName & "() << 1) | 1;\n"
     return s
@@ -306,7 +282,6 @@ vm_transpiler_c["JF"] = proc(d0, d1, d2: string): string =
     return "    if (" & resolveC(d0) & " == 1) goto " & d1 & ";\n"
 
 vm_transpiler_c["CMP"] = proc(d0, d1, d2: string): string =
-    # Inline the string vs integer comparison from your runtime_eq block
     var s = "    if (" & resolveC(d0) & " != 0 && " & resolveC(d1) & " != 0 && (" & resolveC(d0) & " & 7) == 0 && (" & resolveC(d1) & " & 7) == 0) {\n"
     s &= "        sra = (strcmp((char*)" & resolveC(d0) & ", (char*)" & resolveC(d1) & ") == 0) ? 1 : 0;\n"
     s &= "    } else {\n"
@@ -331,21 +306,20 @@ vm_transpiler_c["READ"] = proc(d0, d1, d2: string): string =
     var s = "    {\n"
     s &= "        char* buf = malloc(2048);\n"
     s &= "        if (fgets(buf, 2048, stdin) != NULL) {\n"
-    s &= "            buf[strcspn(buf, \"\\n\")] = 0;\n"  # Strip trailing newline
+    s &= "            buf[strcspn(buf, \"\\n\")] = 0;\n"
     s &= "            " & resolveC(d0) & " = (long long)buf;\n"
     s &= "        } else {\n"
     s &= "            " & resolveC(d0) & " = (long long)\"\";\n"
     s &= "        }\n"
     s &= "    }\n"
     return s
-# --- Floats ---
+
 vm_transpiler_c["MOVSD"] = proc(d0, d1, d2: string): string =
     return "    " & d1.replace("%", "") & " = " & resolveC(d0) & ";\n"
 
 vm_transpiler_c["FSTORE"] = proc(d0, d1, d2: string): string =
     return "    static double " & resolveC(d0) & " = " & d1 & ";\n"
 
-# --- Boilerplate ---
 vm_transpiler_c["NOP"] = proc(d0, d1, d2: string): string = return "    // NOP\n"
 vm_transpiler_c["__required"] = proc(d0, d1, d2: string): string = return ""
 vm_transpiler_c["__makeTemp"] = proc(d0, d1, d2: string): string = return ""

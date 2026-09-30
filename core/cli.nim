@@ -16,6 +16,7 @@ var
     vm_execTarget*: string = "native"
     vm_execPlatform*: string = ""
     vm_linkerfiles*: seq[string] = @[]
+    vm_runarguments*: seq[string] = @[]
     vm_generateObjectFile*: bool
 
 let BACKENDS: seq[string] = vm_languages[]
@@ -53,8 +54,9 @@ proc displayHelpMessage(): void =
         "  -b: | <language>                Specify the language to compile/transpile to",
         "  -f: | <language>                Specify the fallback language to recompile to",
         "  -w: | <true|false>              Set the warning state to either show (or not show) warnings",
-        "  -L: | <path/to/file>            Specify a file to link with (can be used more than once)",
-        "  -P: | <platform>                Specify the target platform",
+        "  -l: | <path/to/file>            Specify a file to link with (can be used more than once)",
+        "  -p: | <platform>                Specify the target platform",
+        "  -a: | <argmuent>                Specify an argument to pass to the program when running (can be used more than once)",
         "  -verbose: | <true|false>        Set the verbosity of the virtual machine <Default: false>",
         "  -intermediates: | <true|false>  Prevent clean-up after execution, keeping all intermediate files <Default: false>",
         "",
@@ -104,14 +106,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         vm_recompile = C_setState("recompile", true)
                         vm_execTarget = "c"
                         C_setTranspile(true, "c")
-                    of "lua":
-                        vm_recompile = C_setState("recompile", true)
-                        vm_execTarget = "lua"
-                        C_setTranspile(true, "lua")
-                    of "js":
-                        vm_recompile = C_setState("recompile", true)
-                        vm_execTarget = "javascript"
-                        C_setTranspile(true, "javascript")
+                    # Add New Languages Below (Target)
                     else:
                         echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                         echo "|> Reason: Unsupported Language: " & arg[2..<(arg.len)]
@@ -128,30 +123,37 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         c_backup = "native"
                     of "c":
                         c_backup = "c"
-                    of "lua":
-                        c_backup = "lua"
-                    of "js":
-                        c_backup = "js"
+                    # Add New Languages Below (Fallback)
                     else:
                         echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                         echo "|> Reason: Unsupported Language: " & arg[2..<(arg.len)]
                         quit()
 
+                # Run Arguemnts:
+                elif (arg[0..1] == "a:"):
+                    if arg.len < 3:
+                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
+                        echo "|> Reason: Argument expected after -a:"
+                        quit()
+                    let runarg: string = arg[2..<(arg.len)]
+                    c_runarguments.add(runarg)
+                    vm_runarguments.add(runarg)
+
                 # Linker Files
-                elif (arg[0..1] == "L:"):
+                elif (arg[0..1] == "l:"):
                     if arg.len < 3:
                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
-                       echo "|> Reason: Language argument expected after -L:"
+                       echo "|> Reason: Language argument expected after -l:"
                        quit()
                     let file: string = arg[2..<(arg.len)]
                     c_linkerfiles.add(file)
                     vm_linkerfiles.add(file)
 
                 # Target Platform
-                elif (arg[0..1] == "P:"):
+                elif (arg[0..1] == "p:"):
                     if arg.len < 3:
                       echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
-                      echo "|> Reason: Language argument expected after -L:"
+                      echo "|> Reason: Language argument expected after -p:"
                     let platform: string = arg[2..<(arg.len)]
                     C_setPlatform("amd64", platform)
 
