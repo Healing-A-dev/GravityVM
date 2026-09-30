@@ -12,7 +12,7 @@ import targets/transpiler/c/packaging
 import targets/transpiler/javascript/packaging
 
 # Instance Variables
-const c_version*: string = "0.0.3+20"
+const c_version*: string = "0.0.3+21"
 type OPARGUMENTS* = tuple[memory_address: string, arg0: string, arg1: string]
 var
     c_cmds: Table[string, proc(d0: string, d1: string, d2: string): string] =  vm_getTarget()
