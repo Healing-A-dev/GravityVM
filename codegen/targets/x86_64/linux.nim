@@ -60,12 +60,12 @@ x86_64_linux["STORE"] = proc(d0: string, d1: string, d2: string): string =
             let cleanDest = resolve(dest.replace("!", ""))
             return setSection(".text") & "    movq $0, " & cleanDest & "\n"
 
-        if dest.startsWith("!") or dest.contains("(%rbp)"):
-            let cleanDest = resolve(dest.replace("!", ""))
-            to_append.add(setSection(".text"))
-            to_append.add("    mov " & resolve(src) & ", %r11\n")
-            to_append.add("    mov %r11, " & cleanDest & "\n")
-            return to_append
+    if dest.startsWith("!") or dest.contains("(%rbp)"):
+        let cleanDest = resolve(dest.replace("!", ""))
+        to_append.add(setSection(".text"))
+        to_append.add("    mov " & resolve(src) & ", %r11\n")
+        to_append.add("    mov %r11, " & cleanDest & "\n")
+        return to_append
 
     var safeValue = src
     if safeValue.contains("%") or safeValue.contains("$") or safeValue.contains("@"): safeValue = "0"
