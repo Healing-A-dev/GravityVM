@@ -10,6 +10,7 @@ import ../core/pattern
 import targets/transpiler/lua/packaging
 import targets/transpiler/c/packaging
 import targets/transpiler/javascript/packaging
+import targets/transpiler/python/packaging
 
 # Instance Variables
 const c_version*: string = "0.0.3+21"
@@ -169,10 +170,13 @@ proc C_generateASM*(): void =
     c_out.writeLine("    .file \"" & c_input & "\"")
     c_out.writeLine("    .text")
     if c_bss.len > 0:
-        c_out.writeLine("    .section .bss")
+        if not vm_target.isNil and vm_target[] == "darwin":
+            c_out.writeLine("    .section __DATA,__bss")
+        else:
+            c_out.writeLine("    .bss")
         c_out.writeLine(c_bss.join(""))
     if c_data.len > 0:
-        c_out.writeLine("    .section .data")
+        c_out.writeLine("    .data")
         c_out.writeLine(c_data.join(""))
     c_out.writeLine(c_text.join(""))
     if c_rodata.len > 0:
@@ -195,21 +199,31 @@ proc C_transpile*(): void =
         entry_start = lua_entry_start
         entry_end = lua_entry_end
         entry_call = lua_entry_call
+        if not c_tmp.endsWith(".lua"): c_tmp = c_tmp & ".lua"
     of "c":
         setup = c_setup
         comment_char = c_comment_char
         entry_start = c_entry_start
         entry_end = c_entry_end
         entry_call = c_entry_call
-        c_tmp = c_tmp & ".c"
+        if not c_tmp.endsWith(".c"): c_tmp = c_tmp & ".c"
         c_c = c_compiler
-    of "javascript":
+    of "javascript", "js":
         setup = js_setup
         comment_char = js_comment_char
         entry_start = js_entry_start
         entry_end = js_entry_end
         entry_call = js_entry_call
         c_lang = "node"
+        if not c_tmp.endsWith(".js"): c_tmp = c_tmp & ".js"
+    of "python", "py":
+        setup = python_setup
+        comment_char = python_comment_char
+        entry_start = python_entry_start
+        entry_end = python_entry_end
+        entry_call = python_entry_call
+        c_lang = "python3"
+        if not c_tmp.endsWith(".py"): c_tmp = c_tmp & ".py"
     else:
         discard
 
@@ -245,71 +259,93 @@ proc C_transpile*(): void =
 
 
 proc C_compile*(): int =
-    var files: seq[string] = @[c_tmp, c_output, c_output & ".o"]
-    var exit_code:int = 0
+    var files: seq[string] = @[c_tmp, c_output, c_output & ".gvm.o"]
+    var exit_code: int = 0
     var status: string = "\e[32m[Assemble]\e[0m "
+    let arch = if vm_architecture.isNil or vm_architecture[] == "": "amd64" else: vm_architecture[]
+    let target = if vm_target.isNil or vm_target[] == "": "linux" else: vm_target[]
 
-    # Win64 Compilation (Cross Platform Compilation | ie. Linux -> Windows)
-    if vm_isWin64_CPC[]:
+    # Darwin (macOS x86_64 / arm64)
+    if target == "darwin":
+        let triple = if arch == "aarch64": "arm64-apple-darwin" else: "x86_64-apple-darwin"
+        exit_code = execCmd("clang -target " & triple & " -c -o " & files[2] & " " & files[0])
+        if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+        if c_verbose: echo status & "clang -target " & triple & " -c -o " & files[2] & " " & files[0]
 
-      exit_code = execCmd("x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2")
-      if exit_code != 0:
-        status = "\e[91m[Assemble]\e[0m "
-      if c_verbose:
-        echo status & "x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2"
+        if exit_code == 0 and not c_generateObjectFile:
+            exit_code = execCmd("clang -target " & triple & " -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
+            status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+            if c_verbose: echo status & "clang -target " & triple & " -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
-      # Linking (mingw32-gcc)
-      if exit_code == 0 and not c_generateObjectFile:
-        exit_code = execCmd("x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32 -lbcrypt -lmswsock")
-        status = "\e[32m[Link]\e[0m "
-        if exit_code != 0:
-          status = "\e[91m[Link]\e[0m "
-        if c_verbose:
-          echo status & "x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32"
+        if exit_code == 0 and c_generateObjectFile:
+            exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
 
-    # Win64 Compilation (Same Platform Compilation | ie. Windows -> Windows)
-    elif not vm_isWin64_CPC[] and vm_target[] == "windows":
+    # AArch64 Linux
+    elif arch == "aarch64" and target == "linux":
+        exit_code = execCmd("clang -target aarch64-linux-gnu -c -o " & files[2] & " " & files[0])
+        if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+        if c_verbose: echo status & "clang -target aarch64-linux-gnu -c -o " & files[2] & " " & files[0]
 
-      exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
-      if exit_code != 0:
-        status = "\e[91m[Assemble]\e[0m "
-      if c_verbose:
-        echo status & "as -o " & files[2] & " " & files[0] & " -O2"
+        if exit_code == 0 and not c_generateObjectFile:
+            exit_code = execCmd("clang -target aarch64-linux-gnu -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
+            status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+            if c_verbose: echo status & "clang -target aarch64-linux-gnu -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
-      # Linking (gcc)
-      if exit_code == 0 and not c_generateObjectFile:
-        exit_code = execCmd("gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32")
-        status = "\e[32m[Link]\e[0m "
-        if exit_code != 0:
-          status = " \e[91m[Link]\e[0m "
-        if c_verbose:
-          echo status & "gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32"
+        if exit_code == 0 and c_generateObjectFile:
+            exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
 
-    # Linux/MacOS
+    # Windows (x86_64 / aarch64)
+    elif target == "win64":
+        if arch == "aarch64":
+            exit_code = execCmd("clang -target aarch64-w64-windows-gnu -c -o " & files[2] & " " & files[0])
+            if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+            if c_verbose: echo status & "clang -target aarch64-w64-windows-gnu -c -o " & files[2] & " " & files[0]
+
+            if exit_code == 0 and not c_generateObjectFile:
+                exit_code = execCmd("clang -target aarch64-w64-windows-gnu " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" "))
+                status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+                if c_verbose: echo status & "clang -target aarch64-w64-windows-gnu " & files[2] & " -o " & files[1] & ".exe"
+            if exit_code == 0 and c_generateObjectFile:
+                exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
+        elif vm_isWin64_CPC[]:
+            exit_code = execCmd("x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2")
+            if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+            if c_verbose: echo status & "x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2"
+
+            if exit_code == 0 and not c_generateObjectFile:
+                exit_code = execCmd("x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32 -lbcrypt -lmswsock")
+                status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+                if c_verbose: echo status & "x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe"
+            if exit_code == 0 and c_generateObjectFile:
+                exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
+        else:
+            exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
+            if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+            if c_verbose: echo status & "as -o " & files[2] & " " & files[0] & " -O2"
+
+            if exit_code == 0 and not c_generateObjectFile:
+                exit_code = execCmd("gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32")
+                status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+                if c_verbose: echo status & "gcc " & files[2] & " -o " & files[1] & ".exe"
+            if exit_code == 0 and c_generateObjectFile:
+                exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
+
+    # Host Linux x86_64
     else:
-      if c_generateObjectFile: files[2] = "_" & files[2]
-      exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
-      if exit_code != 0:
-          status = "\e[91m[Assemble]\e[0m "
-      if c_verbose:
-          echo status & "as -o " & files[2] & " " & files[0] & " -O2"
+        if c_generateObjectFile: files[2] = "_" & files[2]
+        exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
+        if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+        if c_verbose: echo status & "as -o " & files[2] & " " & files[0] & " -O2"
 
-      # Linking
-      if exit_code == 0 and not c_generateObjectFile:
-          exit_code = execCmd("ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
-          status = "\e[32m[Link]\e[0m "
-          if exit_code != 0:
-              status = "\e[91m[Link]\e[0m "
-          if c_verbose:
-              echo status & "ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
+        if exit_code == 0 and not c_generateObjectFile:
+            exit_code = execCmd("ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
+            status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+            if c_verbose: echo status & "ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
-      if exit_code == 0 and c_generateObjectFile:
-        exit_code = execCmd("ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" "))
-        status = "\e[32m[Link->Object]\e[0m "
-        if exit_code != 0:
-            status = "\e[91m[Link->Object]\e[0m "
-        if c_verbose:
-            echo status & "ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" ")
+        if exit_code == 0 and c_generateObjectFile:
+            exit_code = execCmd("ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" "))
+            status = if exit_code == 0: "\e[32m[Link->Object]\e[0m " else: "\e[91m[Link->Object]\e[0m "
+            if c_verbose: echo status & "ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" ")
 
     # Cleanup
     if c_clean:
@@ -318,17 +354,14 @@ proc C_compile*(): int =
         files[1] = ""
         status = "\e[32m[Cleanup]\e[0m "
         exit_code = execCmd("rm " & files.join(" "))
-        if exit_code != 0:
-            status = "\e[91m[Cleanup]\e[0m "
-
-        if c_verbose:
-            echo status & "rm " & files.join(" ")
+        if exit_code != 0: status = "\e[91m[Cleanup]\e[0m "
+        if c_verbose: echo status & "rm " & files.join(" ")
 
     return exit_code
 
 
 proc C_run*(): int =
-    if vm_target[] == "transpiler":
+    if vm_target[] == "transpiler" or c_transpile:
         var end_of_path: int = (c_output <?> stripDir(c_output)).Region[0] - 1
         var packaging_location: string = c_output[0..end_of_path]
 
@@ -340,24 +373,35 @@ proc C_run*(): int =
 
         if c_verbose:
             echo "\e[32m[Exec]\e[0m ./" & c_tmp
-        discard execCmd("./" & c_tmp & " " & c_runarguments.join(" "))
-        return
+        return execCmd("./" & c_tmp & " " & c_runarguments.join(" "))
+
+    var execCmdStr = if c_output.startsWith("/"): c_output else: "./" & c_output
+    if (vm_target[] == "win64" or vm_target[] == "windows") and hostOS == "linux":
+        execCmdStr = "wine " & execCmdStr & (if not execCmdStr.endsWith(".exe"): ".exe" else: "")
+    elif (if vm_architecture.isNil: "" else: vm_architecture[]) == "aarch64" and hostCPU != "aarch64" and hostCPU != "arm64":
+        execCmdStr = "qemu-aarch64 " & execCmdStr
+
     if c_verbose:
-        echo "\e[32m[Exec]\e[0m ./" & c_output
-    return execCmd("./" & c_output & " " & c_runarguments.join(" "))
+        echo "\e[32m[Exec]\e[0m " & execCmdStr
+    return execCmd(execCmdStr & " " & c_runarguments.join(" "))
 
 
 proc buildC(compiler: string, output_command: string = "-o"): void =
     if c_c == "":
         return
 
-    var status: int = execCmd(compiler & " " & output_command & " " & c_output & " " & c_tmp)
+    var linkerFlags = ""
+    if c_linkerfiles.len > 0:
+        linkerFlags = " " & c_linkerfiles.join(" ")
+    if not linkerFlags.contains("-lncurses"):
+        linkerFlags &= " -lncurses -lm"
+    var status: int = execCmd(compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags)
     var tag: string = "\e[96m[" & c_c & "]\e[0m"
     if status != 0:
         tag = "\e[91m[" & c_c & "]\e[0m"
 
     if c_verbose:
-        echo compiler & " " & output_command & " " & c_output & " " & c_tmp & " " & tag
+        echo compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags & " " & tag
 
     if c_clean:
         tag = "\e[96m[Cleanup]\e[0m"
@@ -377,19 +421,31 @@ proc C_buildProgram*(instructions: seq[string], recompile: int = 1): tuple[ERRCO
         if not c_debug and c_build:
             if recompile != 0:
                 C_transpile()
-                buildC(c_c)
-                discard execCmd("chmod +x " & c_output)
+                if c_lang == "c":
+                    buildC(c_c)
+                    discard execCmd("chmod +x " & c_output)
+                else:
+                    discard execCmd("chmod +x " & c_tmp)
+                    if c_tmp != c_output:
+                        try:
+                            copyFile(c_tmp, c_output)
+                            discard execCmd("chmod +x " & c_output)
+                        except:
+                            discard
             else:
                 c_tmp = c_output
 
             if c_run:
                 quit(C_run())
+            return (ERRCODE: 0, Run: c_run)
     else:
         if not c_debug and c_build:
             if recompile == 0 and not c_recompile:
                 if c_run:
                     quit(C_run())
+                return (ERRCODE: 0, Run: c_run)
             else:
                 C_generateASM()
                 let status: int = C_compile()
                 return (ERRCODE: status, Run: c_run)
+    return (ERRCODE: 0, Run: false)

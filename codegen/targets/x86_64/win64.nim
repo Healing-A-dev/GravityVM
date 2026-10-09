@@ -213,11 +213,30 @@ x86_64_win64["FREAD"] = proc(d0, d1, d2: string): string = return setSection(".t
 x86_64_win64["READF"] = proc(d0, d1, d2: string): string = return setSection(".text") & load(d1, "%rdi") & "    call read_file\n    mov %rax, " & resolve(d0) & "\n"
 x86_64_win64["FCLOSE"] = proc(d0, d1, d2: string): string = return setSection(".text") & load(d0, "%rdi") & "    call file_close\n"
 
+x86_64_win64["ETRN"] = proc(d0, d1, d2: string): string =
+    var to_append = setSection(".text")
+    to_append.add("    # FFI SHIELD (WIN64)\n")
+    to_append.add("    push %r10\n")
+    to_append.add("    push %r11\n")
+    to_append.add("    push %r15\n")
+    to_append.add("    mov %rsp, %r15\n")
+    to_append.add("    sub $32, %rsp\n")
+    to_append.add("    and $-16, %rsp\n")
+    to_append.add("    xor %rax, %rax\n")
+    to_append.add("    call " & d0.replace("[","").replace("]","") & "\n")
+    to_append.add("    mov %r15, %rsp\n")
+    to_append.add("    pop %r15\n")
+    to_append.add("    pop %r11\n")
+    to_append.add("    pop %r10\n")
+    to_append.add("    shl $1, %rax\n")
+    to_append.add("    or $1, %rax\n")
+    return to_append
+
 x86_64_win64["ARGV"] = proc(d0, d1, d2: string): string =
     let lblSafe = "argv_safe_" & $labelCounter
     let lblDone = "argv_done_" & $labelCounter
     labelCounter.inc()
-    return setSection(".text") & load(d0, "%rax") & "    sar $1, %rax\n    cmp newton_argc(%rip), %rax\n    jl " & lblSafe & "\n    movq $1, " & resolve(d1) & "\n    jmp " & lblDone & "\n" & lblSafe & ":\n    mov %rax, %rdi\n    call runtime_get_arg\n    mov %rax, " & resolve(d1) & "\n" & lblDone & ":\n"
+    return setSection(".text") & load(d0, "%rax") & "    sar $1, %rax\n    cmp __argc(%rip), %rax\n    jl " & lblSafe & "\n    movq $1, " & resolve(d1) & "\n    jmp " & lblDone & "\n" & lblSafe & ":\n    mov %rax, %rdi\n    call runtime_get_arg\n    mov %rax, " & resolve(d1) & "\n" & lblDone & ":\n"
 
 x86_64_win64["CAT"] = proc(d0, d1, d2: string): string = return setSection(".text") & load(d1, "%rdi") & load(d2, "%rsi") & "    call string_concat\n    mov %rax, " & resolve(d0) & "\n"
 x86_64_win64["TYPEOF"] = proc(d0, d1, d2: string): string = return setSection(".text") & load(d1, "%rdi") & "    call get_type_str\n    mov %rax, " & resolve(d0) & "\n"
@@ -227,6 +246,29 @@ x86_64_win64["COPY"] = proc(d0, d1, d2: string): string = return setSection(".te
 x86_64_win64["ITS"] = proc(d0, d1, d2: string): string = return setSection(".text") & load(d1, "%rdi") & "    call runtime_to_string\n    mov %rax, " & resolve(d0) & "\n"
 x86_64_win64["MOVSD"] = proc(d0, d1, d2: string): string = return setSection(".text") & "    movsd " & d0 & "(%rip), %" & d1 & "\n"
 x86_64_win64["FSTORE"] = proc(d0, d1, d2: string): string = return setSection(".data") & d0 & ": .double " & d1 & "\n"
+
+# --- NETWORKING (WIN64) ---
+x86_64_win64["NET_SOCKET"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & "    call socket_create\n    mov %rax, " & resolve(d0) & "\n"
+
+x86_64_win64["NET_BIND"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & load(d0, "%rdi") & load(d1, "%rsi") & "    call socket_bind\n"
+
+x86_64_win64["NET_LISTEN"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & load(d0, "%rdi") & "    call socket_listen\n"
+
+x86_64_win64["NET_ACCEPT"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & load(d1, "%rdi") & "    call socket_accept\n    mov %rax, " & resolve(d0) & "\n"
+
+x86_64_win64["NET_WRITE"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & load(d0, "%rdi") & load(d1, "%rsi") & "    call socket_write\n"
+
+x86_64_win64["NET_CLOSE"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & load(d0, "%rdi") & "    call socket_close\n"
+
+x86_64_win64["NET_RECV"] = proc(d0, d1, d2: string): string =
+    return setSection(".text") & load(d1, "%rdi") & load(d2, "%rsi") & "    call socket_read\n    mov %rax, " & resolve(d0) & "\n"
+
 x86_64_win64["NOP"] = proc(d0: string, d1: string, d2: string): string = return "    nop\n"
 x86_64_win64["__required"] = proc(d0: string, d1: string, d2: string): string = return ""
 x86_64_win64["__makeTemp"] = proc(d0: string, d1: string, d2: string): string = return ""

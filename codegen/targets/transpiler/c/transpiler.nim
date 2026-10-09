@@ -61,22 +61,29 @@ vm_transpiler_c["PUSH"] = proc(d0, d1, d2: string): string =
 
 vm_transpiler_c["CALL"] = proc(d0, d1, d2: string): string =
     let funcLabel = d0.replace("[", "").replace("]", "")
-    let retLabel = getUniqueLabel("RET_ADDR")
-
-    var s = "    stack[--rsp] = (long long)&&" & retLabel & ";\n"
-    s &= "    goto " & funcLabel & ";\n"
-    s &= retLabel & ":\n"
-
     var argCount = 0
     try: argCount = parseInt(d1)
     except: discard
 
-    if argCount > 0:
-        s &= "    rsp += " & $argCount & ";\n"
-
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveC(d2) & " = sra;\n"
-    return s
+    if funcLabel.startsWith("F_") or funcLabel.startsWith("L"):
+        let retLabel = getUniqueLabel("RET_ADDR")
+        var s = "    stack[--rsp] = (long long)&&" & retLabel & ";\n"
+        s &= "    goto " & funcLabel & ";\n"
+        s &= retLabel & ":\n"
+        if argCount > 0:
+            s &= "    rsp += " & $argCount & ";\n"
+        if d2 != "" and d2 != "00":
+            s &= "    " & resolveC(d2) & " = sra;\n"
+        return s
+    else:
+        # External runtime function call
+        var s = "    extern long long " & funcLabel & "(long long, long long, long long, long long, long long, long long);\n"
+        s &= "    sra = (long long)" & funcLabel & "(reg_rdi, reg_rsi, srd, src, reg_r8, reg_r9);\n"
+        if argCount > 0:
+            s &= "    rsp += " & $argCount & ";\n"
+        if d2 != "" and d2 != "00":
+            s &= "    " & resolveC(d2) & " = sra;\n"
+        return s
 
 vm_transpiler_c["RET"] = proc(d0, d1, d2: string): string =
     var s = ""
@@ -126,13 +133,22 @@ vm_transpiler_c["DEC"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d0) & " -= 2;\n"
 
 vm_transpiler_c["LT"] = proc(d0, d1, d2: string): string =
-    return "    " & resolveC(d2) & " = (UNTAG(" & resolveC(d0) & ") < UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
+    var s = "    sra = (UNTAG(" & resolveC(d0) & ") < UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
+    if d2 != "" and d2 != "00":
+        s &= "    " & resolveC(d2) & " = sra;\n"
+    return s
 
 vm_transpiler_c["GT"] = proc(d0, d1, d2: string): string =
-    return "    " & resolveC(d2) & " = (UNTAG(" & resolveC(d0) & ") > UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
+    var s = "    sra = (UNTAG(" & resolveC(d0) & ") > UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
+    if d2 != "" and d2 != "00":
+        s &= "    " & resolveC(d2) & " = sra;\n"
+    return s
 
 vm_transpiler_c["EQ"] = proc(d0, d1, d2: string): string =
-    return "    sra = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 1 : 0;\n"
+    var s = "    sra = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 3 : 1;\n"
+    if d2 != "" and d2 != "00":
+        s &= "    " & resolveC(d2) & " = sra;\n"
+    return s
 
 vm_transpiler_c["JMP"] = proc(d0, d1, d2: string): string =
     return "    goto " & d0.replace("[", "").replace("]", "") & ";\n"
@@ -150,7 +166,8 @@ vm_transpiler_c["STR"] = proc(d0, d1, d2: string): string =
         for i in countup(0, hex.len - 2, 2):
             bytes.add("\\x" & hex[i..i+1])
     let label = d0.replace("$", "").replace("!", "").replace("[", "").replace("]", "")
-    return "    static const char " & label & "[] = \"" & bytes & "\";\n"
+    let numBytes = (hex.len div 2) + 1
+    return "    static const struct { long long header; char data[" & $numBytes & "]; } _" & label & " __attribute__((aligned(8))) = { 1, \"" & bytes & "\" };\n    #define " & label & " (_" & label & ".data)\n"
 
 vm_transpiler_c["NEWMAP"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d0) & " = gvm_map_new();\n"
@@ -159,7 +176,7 @@ vm_transpiler_c["MSET"] = proc(d0, d1, d2: string): string =
     return "    gvm_map_set(" & resolveC(d0) & ", " & resolveC(d1) & ", " & resolveC(d2) & ");\n"
 
 vm_transpiler_c["CAT"] = proc(d0, d1, d2: string): string =
-    return "    " & resolveC(d0) & " = gvm_str_cat(" & resolveC(d1) & ", " & resolveC(d2) & ");\n"
+    return "    " & resolveC(d0) & " = string_concat(" & resolveC(d1) & ", " & resolveC(d2) & ");\n"
 
 vm_transpiler_c["FOPEN"] = proc(d0, d1, d2: string): string =
     var s = "    " & resolveC(d0) & " = gvm_file_open(" & resolveC(d1) & ", " & resolveC(d2) & ");\n"
@@ -181,10 +198,10 @@ vm_transpiler_c["COPY"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d1) & " = " & resolveC(d0) & ";\n"
 
 vm_transpiler_c["ITS"] = proc(d0, d1, d2: string): string =
-    return "    " & resolveC(d0) & " = gvm_int_to_str(" & resolveC(d1) & ");\n"
+    return "    " & resolveC(d0) & " = (long long)runtime_to_string(" & resolveC(d1) & ");\n"
 
 vm_transpiler_c["TYPEOF"] = proc(d0, d1, d2: string): string =
-    return "    " & resolveC(d0) & " = gvm_typeof(" & resolveC(d1) & ");\n"
+    return "    " & resolveC(d0) & " = (long long)get_type_str(" & resolveC(d1) & ");\n"
 
 vm_transpiler_c["NEWARR"] = proc(d0, d1, d2: string): string =
     var s = "    {\n"
@@ -275,6 +292,7 @@ vm_transpiler_c["EXPO"] = proc(d0, d1, d2: string): string =
 vm_transpiler_c["ETRN"] = proc(d0, d1, d2: string): string =
     var s = "    // FFI SHIELD\n"
     let funcName = d0.replace("[", "").replace("]", "")
+    s &= "    extern long long " & funcName & "();\n"
     s &= "    sra = ((long long)" & funcName & "() << 1) | 1;\n"
     return s
 
@@ -283,9 +301,9 @@ vm_transpiler_c["JF"] = proc(d0, d1, d2: string): string =
 
 vm_transpiler_c["CMP"] = proc(d0, d1, d2: string): string =
     var s = "    if (" & resolveC(d0) & " != 0 && " & resolveC(d1) & " != 0 && (" & resolveC(d0) & " & 7) == 0 && (" & resolveC(d1) & " & 7) == 0) {\n"
-    s &= "        sra = (strcmp((char*)" & resolveC(d0) & ", (char*)" & resolveC(d1) & ") == 0) ? 1 : 0;\n"
+    s &= "        sra = (strcmp((char*)" & resolveC(d0) & ", (char*)" & resolveC(d1) & ") == 0) ? 3 : 1;\n"
     s &= "    } else {\n"
-    s &= "        sra = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 1 : 0;\n"
+    s &= "        sra = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 3 : 1;\n"
     s &= "    }\n"
 
     if d2 != "" and d2 != "00":
@@ -300,7 +318,7 @@ vm_transpiler_c["WRITE"] = proc(d0, d1, d2: string): string =
     return "    printf(\"%lld\", UNTAG(" & resolveC(arg) & "));\n"
 
 vm_transpiler_c["WRITES"] = proc(d0, d1, d2: string): string =
-    return "    printf(\"%s\", (char*)" & resolveC(d0) & ");\n"
+    return "    print_string((long long)" & resolveC(d0) & ");\n"
 
 vm_transpiler_c["READ"] = proc(d0, d1, d2: string): string =
     var s = "    {\n"
@@ -343,7 +361,17 @@ vm_transpiler_c["MOV"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d0) & " = " & resolveC(d1) & ";\n"
 
 vm_transpiler_c["NSUB"] = proc(d0, d1, d2: string): string =
-    return "    rsp -= " & resolveC(d0) & ";\n"
+    var val = resolveC(d0)
+    try:
+        let intVal = parseInt(val)
+        return "    rsp -= " & $(intVal div 8) & ";\n"
+    except:
+        return "    rsp -= (" & val & " / 8);\n"
 
 vm_transpiler_c["NADD"] = proc(d0, d1, d2: string): string =
-    return "    rsp += " & resolveC(d0) & ";\n"
+    var val = resolveC(d0)
+    try:
+        let intVal = parseInt(val)
+        return "    rsp += " & $(intVal div 8) & ";\n"
+    except:
+        return "    rsp += (" & val & " / 8);\n"

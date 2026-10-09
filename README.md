@@ -1,149 +1,146 @@
-# GravityVM
-------
-> [!WARNING]
-> GravityVM is VERY work in progress, and I have a lot more to get done with it as well!
--------
-### About:
-GravityVM is a small, lightweight, memory/register based virtual machine that operates on a custom bytecode format.
+<p align="center">
+  <img src="assets/gravityvm_logo.svg" alt="GravityVM Logo" width="620">
+</p>
 
-	Memory addresses range from "01" -> "zz".
-	The bytecode format that GravityVM operates on follows a 4 block structure: INSTRUCTION ARG0 ARG1 ARG2.
+<p align="center">
+  <strong>Universal Bring-Your-Own-Backend (BYOB) Bytecode Compiler &amp; Multi-Target Runtime</strong>
+</p>
 
+<p align="center">
+  <a href="#supported-targets"><img src="https://img.shields.io/badge/Targets-x86__64%20%7C%20AArch64%20%7C%20C%20%7C%20Lua%20%7C%20Python%20%7C%20JS-blueviolet?style=flat-square" alt="Targets"></a>
+  <a href="#byob-compiler-platform"><img src="https://img.shields.io/badge/Architecture-BYOB%20Bytecode%20Compiler-orange?style=flat-square" alt="BYOB Architecture"></a>
+  <a href="#caching-engine"><img src="https://img.shields.io/badge/Cache-SHA--256%20Incremental-success?style=flat-square" alt="Cache Engine"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"></a>
+</p>
 
-	Each bytecode is a total length of 2 characters (ie. "02") with a few exceptions.
-	Exception 1:
-	   Anything surrounded by '[]' is either a string value, a float, any integer with a value over 100, or a special register location
-	Exception 2:
-	   Anything begining with [@, $, %] represent pointers to a location in a given memory pool
+---
 
+## Overview
 
-	There are 4 possible memory locations within Gravity:
-	 - Global Memory Pool [@]
-	 - Local Memory Pool [$]
-	 - Buffer Memory Pool [%]
-	 - Special Register Locations [<register-location>]
+**GravityVM (GVM)** is a high-performance **Bring-Your-Own-Backend (BYOB)** compiler platform and intermediate virtual machine. While originally designed alongside the Newton programming language, GravityVM is fully decoupled and can serve as the backend for **any** custom programming language compiler.
 
+GravityVM consumes structured, compact bytecode (`.gvt`) and compiles it directly into native machine code (x86_64, AArch64) or transpiles it into clean, standalone scripts across multiple ecosystem targets (C, Lua, Python, JavaScript).
 
-	Supports multiple backends:
-	 - Compile to native code (default)
-	 - C
-	 - Lua
-	 - Javascript
-	 
+### Key Features
+- **BYOB (Bring-Your-Own-Backend) Architecture**: Write a compiler frontend in any language that emits `.gvt` bytecode, and immediately target native machine code or script engines.
+- **Native Assembly Code Generation**: Direct assembly generation with GNU `as`/`ld` and LLVM `clang`.
+- **4 Production Transpilation Backends**:
+  - **C Target** (`-b:c`): Standard C code with SysV AMD64 register calling convention.
+  - **Lua Target** (`-b:lua`): Standalone Lua 5.4 script with native unstructured `goto` and return trampolines.
+  - **Python Target** (`-b:python`): Zero-overhead CFG state machine (`while pc is not None:`).
+  - **JavaScript Target** (`-b:javascript`): Fast V8 / Node.js switch-case state machine.
+- **SHA-256 Incremental Cache Engine**: Sub-millisecond recompilation checks with automatic dependency hashing.
+- **Tagged Integer & Heap Value Model**: Unboxed 63-bit integer representations for fast arithmetic without garbage collection overhead.
 
-### Spcial Register List:
-	sra
-	srb
-	src
-	srd
-	sre
-	srnl (used for only for newline char | value should NOT be changed)
+---
 
-### Instructions: (NAME: OPCDE: [Arguments])
-    00:  NOP         [00, 00, 00]
-    01:  READ        [Location, 00, 00]
-    02:  WRITE       [Location/Hex String, 00, 00]
-    03:  STORE       [Location, Data, 00]
-    04:  DEL         [Location, 00]
-    05:  ADD         [Location/Number, Location/Number, Location <Default: sra>]
-    06:  SUB         [Location/Number, Location/Number, Location <Default: sra>]
-    07:  MUL         [Location/Number, Location/Number, Location <Default: sra>]
-    08:  DIV         [Location/Number, Location/Number, Location <Default: sra>]
-    09:  EXP         [Location/Number, Location/Number, Location <Default: sra>]
-    0A:  COPY        [Location, Data, 00]
-    0B:  JMP         [Label, 00, 00]
-    0C:  JNZ         [Label, 00, 00]
-    0D:  CMP         [Location, Location, 00]
-    0E:  INC         [Location, 00]
-    0F:  DEC         [Location, 00]
-    0G:  UPD         [Location, Data, 00]
-    0H:  MALLOC      [Memory Pool Type, 00, 00]
-    0I:  FREE        [Memory Pool Type, 00, 00]
-    0J:  LBL         [Hex String, 00, 00]
-    0K:  JNZ         [Label, 00, 00]
-    0L:  EXIT        [Location/Number, 00, 00]
-    0M:  LT          []
-    0N:  GT          []
-    0P:  JF          []
-    0O:  ITS         []
-    0T:  TYPEOF      []
-    1A:  PUSH        []
-    1B:  CALL        []
-    1C:  RET         []
-    1D:  GETARG      []
-    1E:  STR         []
-    1F:  WRITES      []
-    1G:  CALLD       []
-    1H:  EXPO        []
-    1I:  ETRN        []
-    20:  NEWMAP      []
-    21:  MSET        []
-    22:  MGET        []
-    23:  MLEN        []
-    24:  MHEAD       []
-    25:  MKEY        []
-    26:  MVAL        []
-    27:  MNEXT       []
-    30:  NEWARR      []
-    28:  FOPEN       []
-    29:  FWRITE      []
-    2A:  FREAD       []
-    2B:  FCLOSE      []
-    2E:  READF       []
-    2C:  ARGV        []
-    2D:  CAT         []
-    3A:  MOVSD       []
-    3B:  FSTORE      []
-    40:  MOV         []
-    41:  NSUB        []
-    42:  NADD        []
-    50:  NET_SOCKET  []
-    51:  NET_BIND    []
-    52:  NET_LISTEN  []
-    53:  NET_ACCEPT  []
-    54:  NET_WRITE   []
-    55:  NET_CLOSE   []
-    56:  NET_RECV    []
-----
-# Example Program
-- Note: Gravity does NOT support comments, they are only here for documentation purposes:
+## The BYOB Model: Runtime Libraries Explained
+
+> [!IMPORTANT]
+> **GravityVM Does NOT Ship With `libnewton.o`**:
+> When compiling to native machine code (`-b:native`) or C (`-b:c`), GravityVM generates raw assembly and object code that references primitive runtime procedures (e.g. arithmetic, collection access).
+> 
+> - **Newton Language**: Programs compiled from Newton link against Newton's runtime library via `-l:path/to/libnewton.o`.
+> - **Custom Language Compilers**: When targeting GravityVM with your own language, **you bring your own runtime backend library** (compiled to `.o` or `.a` from C, Rust, Nim, etc.) and pass it via `-l:my_runtime.o`.
+> - **Script Transpilation Targets (Lua, Python, JS)**: Do **not** require any external object file. GravityVM automatically embeds a complete, self-contained runtime environment directly into the generated script!
+
+For a full step-by-step guide on writing a compiler frontend targeting GravityVM, see the [**BYOB Compiler Guide (`docs/byob_compiler_guide.md`)**](docs/byob_compiler_guide.md).
+
+---
+
+## Supported Targets
+
+| Backend Target | CLI Flag | Status | Output Format | Runtime Requirements |
+|---|---|---|---|---|
+| **Native x86_64** | `-b:native` (default) | Production | ELF / Mach-O / PE Binary | GNU `as` + `ld` or `clang` (+ optional `-l:runtime.o`) |
+| **Native AArch64** | `-b:native -arch:aarch64` | Production | ARM64 Binary | `clang -target aarch64-linux-gnu` (+ optional `-l:runtime.o`) |
+| **C Source** | `-b:c` | Production | Native Binary / `.c` source | Clang or GCC (+ optional `-l:runtime.o`) |
+| **Lua Script** | `-b:lua` | Production | Standalone `.lua` script | Lua 5.4+ or LuaJIT (Self-contained) |
+| **Python Script** | `-b:python` / `-b:py` | Production | Standalone `.py` script | Python 3.8+ (Self-contained) |
+| **JavaScript** | `-b:javascript` / `-b:js` | Production | Standalone `.js` script | Node.js 16+, Bun, or Deno (Self-contained) |
+
+---
+
+## Quick Start
+
+### 1. Building the GravityVM Binary
+GravityVM is written in Nim. Build and install the `gvm` executable:
+```bash
+make build
 ```
-// Allocate (Reserve) 10 slots in the local memory pool (only 2 are needed, but for example purposes i will allocate more)
-0H $00 10 00
+This compiles `gvm` in release mode and installs it to `~/.local/bin/gvm`.
 
-// Allocating (Reserving) 3842 (the maximum) spots in the global and buffer (temporary) memory pools repectivly (Only for example)
-0H @00 3842 00
-0H %00 3842 00
+### 2. Compiling and Running Bytecode
 
-// Storing '10' into the local memory pool (at position 01 ($01)
-03 $01 10 00
-
-// Storing '20' into the global memory pool (at position 0a ($0a)
-03 @0a 20 00
-
-// Add $01 and @0a
-05 $01 @0a 00
-
-// OPTION 1:
-// Print register [sra] directly
-02 [sra] 00 00
-02 [srnl] 00 00 // Newline character
-
-// OPTION 2:
-// Move [sra] to a memory pool location and display the memory pool location
-0A %01 [sra] 00
-02 %01 00 00
-02 [srnl] 00 00
-
-
-// Note, string can be directly printed:
-// 02 [Hello, World\n] 00 00 -> Hello, World
-
-// Exit code safely
-0L 0 00 00
-
-// Free Local, Global, and Buffer memory pools respectivly
-0I $00 00 00
-0I @00 00 00
-0I %00 00 00
+#### Compile to Native Executable:
+```bash
+# Provide your language runtime object via -l: (e.g. libnewton.o or my_runtime.o)
+./gvm build -i:main.gvt -l:path/to/runtime.o -o:main
+./main
 ```
+
+#### Transpile and Run via C:
+```bash
+./gvm build -b:c -i:main.gvt -l:path/to/runtime.o -o:main_c
+./main_c
+```
+
+#### Transpile and Run via Lua (Self-Contained):
+```bash
+./gvm build -b:lua -i:main.gvt -o:main.lua
+lua main.lua
+```
+
+#### Transpile and Run via Python (Self-Contained):
+```bash
+./gvm build -b:python -i:main.gvt -o:main.py
+python3 main.py
+```
+
+#### Transpile and Run via JavaScript (Self-Contained):
+```bash
+./gvm build -b:javascript -i:main.gvt -o:main.js
+node main.js
+```
+
+---
+
+## Adding Your Own Backend Target
+
+GravityVM makes it remarkably easy to add new compilation and transpilation backends (such as Go, Ruby, Rust, or WebAssembly).
+
+See the step-by-step walkthrough in [**`codegen/targets/transpiler/Languages.md`**](codegen/targets/transpiler/Languages.md) and check out the scaffold templates in [**`codegen/targets/transpiler/template/`**](codegen/targets/transpiler/template/).
+
+---
+
+## Verification & Test Suite
+
+Run the full end-to-end regression test suite:
+```bash
+make build-test
+```
+
+To test all 4 transpilation backends concurrently on a bytecode file:
+```bash
+# Clean cache and test each backend
+./gvm clean-cache && ./gvm build -b:c -i:main.gvt -l:/home/healing/.newton/lib/libnewton.o -o:test_c && ./test_c
+./gvm clean-cache && ./gvm build -b:lua -i:main.gvt -o:test_lua.lua && lua test_lua.lua
+./gvm clean-cache && ./gvm build -b:python -i:main.gvt -o:test_py.py && python3 test_py.py
+./gvm clean-cache && ./gvm build -b:javascript -i:main.gvt -o:test_js.js
+```
+
+---
+
+## Documentation
+
+- [**BYOB Compiler Guide (`docs/byob_compiler_guide.md`)**](docs/byob_compiler_guide.md): How to build a custom compiler frontend targeting GravityVM, including full Python and Nim bytecode emitter snippets.
+- [**Adding Language Support (`codegen/targets/transpiler/Languages.md`)**](codegen/targets/transpiler/Languages.md): How to add custom transpilation targets to GravityVM.
+- [**Virtual Machine Architecture (`docs/architecture.md`)**](docs/architecture.md): ISA specification, binary container format, memory pools, tagged pointers, and calling conventions.
+- [**CLI Command & Flag Reference (`docs/cli_reference.md`)**](docs/cli_reference.md): Detailed explanation of all commands (`build`, `run`, `generate-object`, `clean-cache`, `disassemble`) and options.
+- [**Transpiler Subsystems (`docs/transpilers.md`)**](docs/transpilers.md): Deep-dive into C, Lua, Python, and JavaScript code generation, CFG linearization, and runtime library implementation.
+
+---
+
+## License
+
+This project is licensed under the MIT License.

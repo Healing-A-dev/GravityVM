@@ -1,4 +1,11 @@
 const c_setup*: string = """
+extern long long string_concat(long long, long long);
+__attribute__((weak)) long long __argc;
+__attribute__((weak)) char** __sys_argv;
+__attribute__((weak)) void* __sys_stack_base = (void*)1;
+extern long long get_type_str(long long, ...);
+extern long long runtime_to_string(long long, ...);
+extern void print_string(long long, ...);
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -679,7 +686,7 @@ newton_sizeof: {
 """
 
 const c_comment_char*: string = "//"
-const c_entry_start*: string = "int main(int argc, char** argv) {\n    global_argc = argc;\n    global_argv = argv;\n    goto ENTRY;\n"
+const c_entry_start*: string = "int main(int argc, char** argv) {\n    __argc = argc;\n    __sys_argv = argv;\n    __sys_stack_base = (void*)1;\n    global_argc = argc;\n    global_argv = argv;\n    goto ENTRY;\n"
 const c_entry_end*: string = "\n" & c_runtime_labels & "\n}"
 const c_entry_call*: string = "main()"
 const c_compiler*: string = "gcc"
