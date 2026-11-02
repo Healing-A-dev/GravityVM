@@ -393,24 +393,22 @@ proc buildC(compiler: string, output_command: string = "-o"): void =
     var linkerFlags = ""
     if c_linkerfiles.len > 0:
         linkerFlags = " " & c_linkerfiles.join(" ")
-    if not linkerFlags.contains("-lncurses"):
-        linkerFlags &= " -lncurses -lm"
     var status: int = execCmd(compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags)
-    var tag: string = "\e[96m[" & c_c & "]\e[0m"
+    var tag: string = "\e[32m[" & c_c.titleize & "]\e[0m"
     if status != 0:
-        tag = "\e[91m[" & c_c & "]\e[0m"
+        tag = "\e[91m[" & c_c.titleize & "]\e[0m"
 
     if c_verbose:
-        echo compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags & " " & tag
+        echo tag & " " & compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags
 
     if c_clean:
-        tag = "\e[96m[Cleanup]\e[0m"
+        tag = "\e[32m[Cleanup]\e[0m"
         status = execCmd("rm " & c_tmp)
         if status != 0:
             tag = "\e[91m[Cleanup]\e[0m"
 
         if c_verbose:
-            echo "rm " & c_tmp & " " & tag
+            echo tag & " rm " & c_tmp
 
     c_tmp = c_tmp[0..<(c_tmp.len - 2)]
 

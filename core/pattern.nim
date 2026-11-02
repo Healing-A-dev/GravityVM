@@ -5,7 +5,7 @@ Description: A simple library to add some utility functions (mainly pattern mata
 Reason: Created for systems that do not have libpcre or systems were libpcre is not located by nim
 ]#
 
-
+import strutils
 
 # String Reverse
 proc p_reverse*(str: string): string =
@@ -40,9 +40,9 @@ proc `<?>`* (str: string, pattern: string, offset: int = 0): tuple[Result: bool,
             return (Result: true, Region: @[bottom, (size_p + bottom) - 1], Pattern: window.p_join())
         elif window.len == size_p and window.p_join() != pattern:
            window = @[]
-          
+
         bottom = bottom + 1
-        
+
     return (Result: false, Region: @[-1], Pattern: "")
 
 
@@ -69,3 +69,11 @@ proc chomp*(str: string, to_replace: string, amount: int = 1): string =
         return char_array.p_join()
     else:
         return str
+
+# Titileize
+proc titleize*(str: var string): string =
+    var first_char: char = str[0]
+    if not isUpperAscii(first_char):
+        first_char = toUpperAscii(first_char)
+    str[0] = first_char
+    return str
