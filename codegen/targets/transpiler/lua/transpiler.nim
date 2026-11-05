@@ -15,7 +15,9 @@ proc resolveLua(arg: string): string =
     if arg.len == 0 or arg == "0": return "0"
     let cleanArg = arg.strip().replace("!", "").replace("[", "").replace("]", "")
 
-    if cleanArg == "%rax" or cleanArg == "sra": return "sra"
+    if cleanArg == "%rax" or cleanArg == "sra" or cleanArg == "r0": return "r0"
+    if cleanArg in ["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
+        return cleanArg
     if cleanArg == "%rbx" or cleanArg == "srb": return "srb"
     if cleanArg == "%rcx" or cleanArg == "src": return "src"
     if cleanArg == "%rdx" or cleanArg == "srd": return "srd"
@@ -103,19 +105,40 @@ vm_transpiler_lua["UPD"] = proc(d0: string, d1: string, d2: string): string =
 
 # --- Math ---
 vm_transpiler_lua["ADD"] = proc(d0: string, d1: string, d2: string): string =
-    return "    sra = TAG(UNTAG(" & resolveLua(d0) & ") + UNTAG(" & resolveLua(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = TAG(UNTAG(" & resolveLua(d0) & ") + UNTAG(" & resolveLua(d1) & "))\n"
 
 vm_transpiler_lua["SUB"] = proc(d0: string, d1: string, d2: string): string =
-    return "    sra = TAG(UNTAG(" & resolveLua(d0) & ") - UNTAG(" & resolveLua(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = TAG(UNTAG(" & resolveLua(d0) & ") - UNTAG(" & resolveLua(d1) & "))\n"
 
 vm_transpiler_lua["MUL"] = proc(d0: string, d1: string, d2: string): string =
-    return "    sra = TAG(UNTAG(" & resolveLua(d0) & ") * UNTAG(" & resolveLua(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = TAG(UNTAG(" & resolveLua(d0) & ") * UNTAG(" & resolveLua(d1) & "))\n"
 
 vm_transpiler_lua["DIV"] = proc(d0: string, d1: string, d2: string): string =
-    return "    sra = TAG(math.floor(UNTAG(" & resolveLua(d0) & ") / UNTAG(" & resolveLua(d1) & ")))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = TAG(math.floor(UNTAG(" & resolveLua(d0) & ") / UNTAG(" & resolveLua(d1) & ")))\n"
 
 vm_transpiler_lua["EXP"] = proc(d0: string, d1: string, d2: string): string =
-    return "    sra = TAG(math.floor(UNTAG(" & resolveLua(d0) & ") ^ UNTAG(" & resolveLua(d1) & ")))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = TAG(math.floor(UNTAG(" & resolveLua(d0) & ") ^ UNTAG(" & resolveLua(d1) & ")))\n"
+
+vm_transpiler_lua["IADD"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = (" & resolveLua(d0) & ") + (" & resolveLua(d1) & ")\n"
+
+vm_transpiler_lua["ISUB"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = (" & resolveLua(d0) & ") - (" & resolveLua(d1) & ")\n"
+
+vm_transpiler_lua["IMUL"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = (" & resolveLua(d0) & ") * (" & resolveLua(d1) & ")\n"
+
+vm_transpiler_lua["IDIV"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    return "    " & dest & " = math.floor((" & resolveLua(d0) & ") / (" & resolveLua(d1) & "))\n"
 
 vm_transpiler_lua["COPY"] = proc(d0: string, d1: string, d2: string): string =
     return "    " & resolveLua(d1) & " = " & resolveLua(d0) & "\n"
@@ -134,18 +157,17 @@ vm_transpiler_lua["JMP"] = proc(d0: string, d1: string, d2: string): string =
     return "    goto " & resolveLua(d0).replace("[", "").replace("]", "") & "\n"
 
 vm_transpiler_lua["JNZ"] = proc(d0: string, d1: string, d2: string): string =
-    return "    if sra == 3 then goto " & resolveLua(d0).replace("[", "").replace("]", "") & " end\n"
+    return "    if r0 == 3 or (r0 ~= 0 and r0 ~= 1) then goto " & resolveLua(d0).replace("[", "").replace("]", "") & " end\n"
 
 vm_transpiler_lua["JEZ"] = proc(d0: string, d1: string, d2: string): string =
-    return "    if sra == 0 or sra == 1 then goto " & resolveLua(d0).replace("[", "").replace("]", "") & " end\n"
+    return "    if r0 == 0 or r0 == 1 then goto " & resolveLua(d0).replace("[", "").replace("]", "") & " end\n"
 
 vm_transpiler_lua["JF"] = proc(d0, d1, d2: string): string =
     return "    if " & resolveLua(d0) & " == 1 then goto " & resolveLua(d1).replace("[", "").replace("]", "") & " end\n"
 
 vm_transpiler_lua["CMP"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "    if " & resolveLua(d0) & " == " & resolveLua(d1) & " then sra = 3 else sra = 1 end\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveLua(d2) & " = sra\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    var s = "    if " & resolveLua(d0) & " == " & resolveLua(d1) & " then " & dest & " = 3 else " & dest & " = 1 end\n"
     return s
 
 vm_transpiler_lua["EXIT"] = proc(d0: string, d1: string, d2: string): string =
@@ -168,21 +190,18 @@ vm_transpiler_lua["DEC"] = proc(d0: string, d1: string, d2: string): string =
     return "    " & target & " = " & target & " - 2\n"
 
 vm_transpiler_lua["LT"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "    if " & resolveLua(d0) & " < " & resolveLua(d1) & " then sra = 3 else sra = 1 end\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveLua(d2) & " = sra\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    var s = "    if " & resolveLua(d0) & " < " & resolveLua(d1) & " then " & dest & " = 3 else " & dest & " = 1 end\n"
     return s
 
 vm_transpiler_lua["GT"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "    if " & resolveLua(d0) & " > " & resolveLua(d1) & " then sra = 3 else sra = 1 end\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveLua(d2) & " = sra\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    var s = "    if " & resolveLua(d0) & " > " & resolveLua(d1) & " then " & dest & " = 3 else " & dest & " = 1 end\n"
     return s
 
 vm_transpiler_lua["EQ"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "    if " & resolveLua(d0) & " == " & resolveLua(d1) & " then sra = 3 else sra = 1 end\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveLua(d2) & " = sra\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveLua(d2) else: "r0"
+    var s = "    if " & resolveLua(d0) & " == " & resolveLua(d1) & " then " & dest & " = 3 else " & dest & " = 1 end\n"
     return s
 
 # --- Function & Stack ---
@@ -203,19 +222,19 @@ vm_transpiler_lua["CALL"] = proc(d0: string, d1: string, d2: string): string =
         except: discard
         if argCount > 0:
             s &= "    rsp = rsp + " & $argCount & "\n"
-        if d2 != "" and d2 != "00":
-            s &= "    " & resolveLua(d2) & " = sra\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "    " & resolveLua(d2) & " = r0\n"
         return s
     else:
-        var s = "    sra = gvm_runtime[\"" & funcLabel & "\"]()\n"
-        if d2 != "" and d2 != "00":
-            s &= "    " & resolveLua(d2) & " = sra\n"
+        var s = "    r0 = gvm_runtime[\"" & funcLabel & "\"]()\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "    " & resolveLua(d2) & " = r0\n"
         return s
 
 vm_transpiler_lua["RET"] = proc(d0: string, d1: string, d2: string): string =
     var s = ""
     if d0 != "" and d0 != "0" and d0 != "00":
-        s &= "    sra = " & resolveLua(d0) & "\n"
+        s &= "    r0 = " & resolveLua(d0) & "\n"
     s &= "    rsp = rbp\n"
     s &= "    rbp = stack[rsp]; rsp = rsp + 1\n"
     s &= "    ret_target = stack[rsp]; rsp = rsp + 1; goto DISPATCH\n"
@@ -276,7 +295,8 @@ vm_transpiler_lua["STR"] = proc(d0, d1, d2: string): string =
         for i in countup(0, hexContent.len - 2, 2):
             try: text.add(chr(parseHexInt(hexContent[i .. i+1])))
             except: discard
-    return "    " & resolveLua(d0) & " = \"" & text.replace("\"", "\\\"").replace("\n", "\\n") & "\"\n"
+    let escaped = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    return "    " & resolveLua(d0) & " = \"" & escaped & "\"\n"
 
 vm_transpiler_lua["CAT"] = proc(d0, d1, d2: string): string =
     return "    " & resolveLua(d0) & " = gvm_str_cat(" & resolveLua(d1) & ", " & resolveLua(d2) & ")\n"

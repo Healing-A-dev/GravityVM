@@ -19,20 +19,42 @@ proc fromHexStr(s: string): string =
     result.add(chr(parseHexInt(s[i .. i+1])))
 #
 proc resolve(arg: string): string =
+    if arg == "" or arg == "0" or arg == "00": return "$0"
     if arg.startsWith("str_"): return "$" & arg
     if arg.startsWith("$str_"): return arg
     if arg.contains("sra"): return "%rax"
 
     var cleanArg = arg.replace("!", "").replace("[", "").replace("]", "")
+    case cleanArg
+    of "r0", "%rax", "sra": return "%rax"
+    of "r1", "%rdi": return "%rdi"
+    of "r2", "%rsi": return "%rsi"
+    of "r3", "%rdx": return "%rdx"
+    of "r4", "%rcx": return "%rcx"
+    of "r5", "%r8": return "%r8"
+    of "r6", "%r9": return "%r9"
+    of "r7", "%r10": return "%r10"
+    of "r8", "%r11": return "%r11"
+    of "r9", "%rbx", "srb": return "%rbx"
+    of "r10", "%r12": return "%r12"
+    of "r11", "%r13": return "%r13"
+    of "r12", "%r14": return "%r14"
+    of "r13", "%r15": return "%r15"
+    of "r14": return "-8(%rbp)"
+    of "r15": return "-16(%rbp)"
+    of "%rsp", "rsp": return "%rsp"
+    of "%rbp", "rbp": return "%rbp"
+    else: discard
+
     if cleanArg.contains("(%rbp)"): return cleanArg.replace("$", "")
-    if cleanArg in ["%rax", "%rbx", "%rcx", "%rdx", "%rdi", "%rsi", "%rsp", "%rbp", "%r8", "%r9"]: return cleanArg
+    if cleanArg.contains("(%rsp)"): return cleanArg.replace("$", "")
 
     if cleanArg.startsWith("$"):
         let inner = cleanArg.substr(1)
         if inner.contains("F_"): return "$" & inner
         try:
             discard parseInt(inner)
-            if inner.len > 1 and inner.startsWith("0") and not inner.startsWith("-"):
+            if inner.len > 1 and inner.startsWith("0") and not inner.startsWith("-") and inner != "00":
                 return "L" & inner & "(%rip)"
             return "$" & inner
         except ValueError:
@@ -40,7 +62,7 @@ proc resolve(arg: string): string =
 
     if cleanArg.startsWith("%"): return cleanArg.substr(1) & "(%rip)"
     if cleanArg.startsWith("@"): return "G" & cleanArg[1..^1] & "(%rip)"
-    if (cleanArg.startsWith("L") or cleanArg.startsWith("B")) and not cleanArg.contains("\""): return cleanArg & "(%rip)"
+    if (cleanArg.startsWith("L") or cleanArg.startsWith("B")) and not cleanArg.contains("\"") and cleanArg != "L00": return cleanArg & "(%rip)"
     return "$" & cleanArg
 
 proc getUniqueLabel(prefix: string): string =
@@ -106,6 +128,12 @@ x86_64_linux["LBL"] = proc(d0: string, d1: string, d2: string): string =
     if lbl.startsWith("F_"):
         to_append.add("    push %rbp\n")
         to_append.add("    mov %rsp, %rbp\n")
+        to_append.add("    sub $16, %rsp\n")
+        to_append.add("    push %rbx\n")
+        to_append.add("    push %r12\n")
+        to_append.add("    push %r13\n")
+        to_append.add("    push %r14\n")
+        to_append.add("    push %r15\n")
     return to_append
 
 x86_64_linux["CALL"] = proc(d0: string, d1: string, d2: string): string =
@@ -121,8 +149,10 @@ x86_64_linux["CALL"] = proc(d0: string, d1: string, d2: string): string =
     if argCount > 0:
         s.add("    add $" & $(argCount * 8) & ", %rsp\n")
 
-    if d2 != "00":
-        s.add("    mov %rax, " & resolve(d2) & "\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
     return s
 
 x86_64_linux["CALLD"] = proc(d0, d1, d2: string): string =
@@ -141,7 +171,14 @@ x86_64_linux["CALLD"] = proc(d0, d1, d2: string): string =
 x86_64_linux["RET"] = proc(d0: string, d1: string, d2: string): string =
     var to_append = setSection(".text")
     if d0 != "" and d0 != "0" and d0 != "00":
-        to_append.add("    mov " & resolve(d0) & ", %rax\n")
+        let src = resolve(d0)
+        if src != "%rax":
+            to_append.add("    mov " & src & ", %rax\n")
+    to_append.add("    pop %r15\n")
+    to_append.add("    pop %r14\n")
+    to_append.add("    pop %r13\n")
+    to_append.add("    pop %r12\n")
+    to_append.add("    pop %rbx\n")
     to_append.add("    leave\n    ret\n")
     return to_append
 
@@ -179,37 +216,99 @@ x86_64_linux["ETRN"] = proc(d0, d1, d2: string): string =
 
 # --- ARITHMETIC ---
 x86_64_linux["ADD"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            "    mov " & resolve(d0) & ", %rax\n" &
            "    add " & resolve(d1) & ", %rax\n" &
            "    dec %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
 
 x86_64_linux["SUB"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            "    mov " & resolve(d0) & ", %rax\n" &
            "    sub " & resolve(d1) & ", %rax\n" &
            "    inc %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
 
 x86_64_linux["MUL"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            "    mov " & resolve(d0) & ", %rax\n" &
            "    sar $1, %rax\n" &
-           "    mov " & resolve(d1) & ", %rbx\n" &
-           "    sar $1, %rbx\n" &
-           "    imul %rbx, %rax\n" &
+           "    mov " & resolve(d1) & ", %r11\n" &
+           "    sar $1, %r11\n" &
+           "    imul %r11, %rax\n" &
            "    shl $1, %rax\n" &
            "    or $1, %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
 
 x86_64_linux["DIV"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            "    mov " & resolve(d0) & ", %rax\n" &
            "    sar $1, %rax\n" &
-           "    mov " & resolve(d1) & ", %rbx\n" &
-           "    sar $1, %rbx\n" &
+           "    mov " & resolve(d1) & ", %r11\n" &
+           "    sar $1, %r11\n" &
            "    cqo\n" &
-           "    idiv %rbx\n" &
+           "    idiv %r11\n" &
            "    shl $1, %rax\n" &
            "    or $1, %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
+
+x86_64_linux["IADD"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           "    mov " & resolve(d0) & ", %rax\n" &
+           "    add " & resolve(d1) & ", %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
+
+x86_64_linux["ISUB"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           "    mov " & resolve(d0) & ", %rax\n" &
+           "    sub " & resolve(d1) & ", %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
+
+x86_64_linux["IMUL"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           "    mov " & resolve(d0) & ", %rax\n" &
+           "    imul " & resolve(d1) & ", %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
+
+x86_64_linux["IDIV"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           "    mov " & resolve(d0) & ", %rax\n" &
+           "    mov " & resolve(d1) & ", %r11\n" &
+           "    cqo\n" &
+           "    idiv %r11\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add("    mov %rax, " & dest & "\n")
+    return s
 
 x86_64_linux["INC"] = proc(d0, d1, d2: string): string =
     return setSection(".text") & "    addq $2, " & resolve(d0) & "\n"
@@ -231,7 +330,9 @@ x86_64_linux["LT"] = proc(d0: string, d1: string, d2: string): string =
     s.add(lblTrue & ":\n")
     s.add("    mov $3, %rax\n")
     s.add(lblDone & ":\n")
-    s.add("    mov %rax, " & resolve(d2) & "\n")
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolve(d2) else: "%rax"
+    if dest != "%rax":
+        s.add("    mov %rax, " & dest & "\n")
     return s
 
 x86_64_linux["GT"] = proc(d0: string, d1: string, d2: string): string =
@@ -250,7 +351,9 @@ x86_64_linux["GT"] = proc(d0: string, d1: string, d2: string): string =
     s.add("    mov $3, %rax\n")
 
     s.add(lblDone & ":\n")
-    s.add("    mov %rax, " & resolve(d2) & "\n")
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolve(d2) else: "%rax"
+    if dest != "%rax":
+        s.add("    mov %rax, " & dest & "\n")
     return s
 
 x86_64_linux["EQ"] = proc(d0: string, d1: string, d2: string): string =
@@ -300,13 +403,17 @@ x86_64_linux["CMP"] = proc(d0, d1, d2: string): string =
 x86_64_linux["WRITE"] = proc(d0: string, d1: string, d2: string): string =
     var arg = d0
     if arg.startsWith("[\"") and arg.endsWith("\"]"):
-        let content = arg[2..^3].replace("\\n", "\\n")
+        let content = arg[2..^3].replace("\\n", "\n")
         let lbl = "str_" & $rodata_counter
         rodata_counter.inc()
-        return setSection(".rodata") & lbl & ":\n    .ascii \"" & content & "\"\n    .byte 0\n" &
-               setSection(".text") & "    mov $1, %rax\n    mov $1, %rdi\n    lea " & lbl & "(%rip), %rsi\n    mov $" & d1 & ", %rdx\n    syscall\n"
+        return setSection(".rodata") & lbl & ":\n    .ascii \"" & content.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") & "\"\n    .byte 0\n" &
+               setSection(".text") & "    mov $1, %rax\n    mov $1, %rdi\n    lea " & lbl & "(%rip), %rsi\n    mov $" & $content.len & ", %rdx\n    syscall\n"
 
-    return setSection(".text") & "    mov " & resolve(arg) & ", %rdi\n    call print_int\n"
+    return setSection(".text") &
+           "    mov " & resolve(arg) & ", %rdi\n" &
+           "    call int_to_string\n" &
+           "    mov %rax, %rdi\n" &
+           "    call print_string\n"
 
 x86_64_linux["EXIT"] = proc(d0: string, d1: string, d2: string): string =
     var to_append = setSection(".text")
@@ -610,7 +717,14 @@ x86_64_linux["__comment"] = proc(d0: string, d1: string, d2: string): string =
     return "    # " & d0
 
 x86_64_linux["MOV"] = proc(d0, d1, d2: string): string =
-    return "    mov " & resolve(d1) & ", " & resolve(d0) & "\n"
+    let src = resolve(d1)
+    let dest = resolve(d0)
+    if dest == src: return ""
+    if dest.contains("(%rbp)") and src.contains("(%rbp)"):
+        return "    mov " & src & ", %r11\n    mov %r11, " & dest & "\n"
+    if dest.contains("(%rbp)") and src.startsWith("$"):
+        return "    movq " & src & ", " & dest & "\n"
+    return "    mov " & src & ", " & dest & "\n"
 
 x86_64_linux["NSUB"] = proc(d0, d1, d2: string): string =
     return "    sub " & resolve(d0) & ", %rsp\n"

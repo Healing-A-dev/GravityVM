@@ -25,8 +25,29 @@ proc resolve(arg: string): string =
 
     var cleanArg = arg.replace("!", "").replace("[", "").replace("]", "")
     if cleanArg == "" or cleanArg == "0" or cleanArg == "00": return "$0"
+    case cleanArg
+    of "r0", "%rax", "sra": return "%rax"
+    of "r1", "%rdi": return "%rdi"
+    of "r2", "%rsi": return "%rsi"
+    of "r3", "%rdx": return "%rdx"
+    of "r4", "%rcx": return "%rcx"
+    of "r5", "%r8": return "%r8"
+    of "r6", "%r9": return "%r9"
+    of "r7", "%r10": return "%r10"
+    of "r8", "%r11": return "%r11"
+    of "r9", "%rbx", "srb": return "%rbx"
+    of "r10", "%r12": return "%r12"
+    of "r11", "%r13": return "%r13"
+    of "r12", "%r14": return "%r14"
+    of "r13", "%r15": return "%r15"
+    of "r14": return "-8(%rbp)"
+    of "r15": return "-16(%rbp)"
+    of "%rsp", "rsp": return "%rsp"
+    of "%rbp", "rbp": return "%rbp"
+    else: discard
+
     if cleanArg.contains("(%rbp)"): return cleanArg.replace("$", "")
-    if cleanArg in ["%rax", "%rbx", "%rcx", "%rdx", "%rdi", "%rsi", "%rsp", "%rbp", "%r8", "%r9"]: return cleanArg
+    if cleanArg.contains("(%rsp)"): return cleanArg.replace("$", "")
 
     if cleanArg.startsWith("$"):
         let inner = cleanArg.substr(1)
@@ -202,37 +223,99 @@ x86_64_darwin["ETRN"] = proc(d0, d1, d2: string): string =
 
 # --- ARITHMETIC ---
 x86_64_darwin["ADD"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            mov(resolve(d0), "%rax") &
            "    add " & resolve(d1) & ", %rax\n" &
            "    dec %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
 
 x86_64_darwin["SUB"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            mov(resolve(d0), "%rax") &
            "    sub " & resolve(d1) & ", %rax\n" &
            "    inc %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
 
 x86_64_darwin["MUL"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            mov(resolve(d0), "%rax") &
            "    sar $1, %rax\n" &
-           mov(resolve(d1), "%rbx") &
-           "    sar $1, %rbx\n" &
-           "    imul %rbx, %rax\n" &
+           mov(resolve(d1), "%r11") &
+           "    sar $1, %r11\n" &
+           "    imul %r11, %rax\n" &
            "    shl $1, %rax\n" &
            "    or $1, %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
 
 x86_64_darwin["DIV"] = proc(d0, d1, d2: string): string =
-    return setSection(".text") &
+    var s = setSection(".text") &
            mov(resolve(d0), "%rax") &
            "    sar $1, %rax\n" &
-           mov(resolve(d1), "%rbx") &
-           "    sar $1, %rbx\n" &
+           mov(resolve(d1), "%r11") &
+           "    sar $1, %r11\n" &
            "    cqo\n" &
-           "    idiv %rbx\n" &
+           "    idiv %r11\n" &
            "    shl $1, %rax\n" &
            "    or $1, %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
+
+x86_64_darwin["IADD"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           mov(resolve(d0), "%rax") &
+           "    add " & resolve(d1) & ", %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
+
+x86_64_darwin["ISUB"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           mov(resolve(d0), "%rax") &
+           "    sub " & resolve(d1) & ", %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
+
+x86_64_darwin["IMUL"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           mov(resolve(d0), "%rax") &
+           "    imul " & resolve(d1) & ", %rax\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
+
+x86_64_darwin["IDIV"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text") &
+           mov(resolve(d0), "%rax") &
+           mov(resolve(d1), "%r11") &
+           "    cqo\n" &
+           "    idiv %r11\n"
+    if d2 != "" and d2 != "00" and d2 != "0":
+        let dest = resolve(d2)
+        if dest != "%rax":
+            s.add(mov("%rax", dest))
+    return s
 
 x86_64_darwin["INC"] = proc(d0, d1, d2: string): string =
     return setSection(".text") & "    addq $2, " & resolve(d0) & "\n"

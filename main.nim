@@ -4,6 +4,8 @@ import core/cli
 import core/generation
 import core/cache
 import core/memory
+import core/interpreter
+import core/v1_reg_mapper
 import codegen/codegen
 
 # --- Argument Parsing --- #
@@ -15,16 +17,23 @@ let program: seq[string] = generateInstructions(vm_file_in)
 var valid: int = validateInstructions(program)
 if valid != 0: quit(valid)
 
+# --- Direct In-Process Interpretation --- #
+if vm_interpret:
+    quit(interpretProgram(program))
+
+# --- V1-to-Register Lowering Pass --- #
+let effectiveProgram = if gvm_bytecode_version == 1: liftV1ToRegisters(program) else: program
+
 # --- Cache Comparison --- #
 loadCacheConfig()
-generateData(vm_file_in, program)
+generateData(vm_file_in, effectiveProgram)
 let recompile: int = compareCache(vm_file_in)
 if recompile == 1 or vm_recompile or vm_debug:
-    valid = processInstructions(program, vm_file_in)
+    valid = processInstructions(effectiveProgram, vm_file_in)
     if valid != 0: quit(valid)
 
 # --- Compilation --- #
-let status: tuple = C_buildProgram(program, recompile)
+let status: tuple = C_buildProgram(effectiveProgram, recompile)
 if status.ERRCODE == 0: writeCache(vm_file_in)
 if status.ERRCODE == 0 and status.Run:
     quit(C_run())

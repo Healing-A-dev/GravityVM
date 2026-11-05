@@ -28,7 +28,7 @@ GravityVM bytecode is a compact binary format composed of an 8-byte file header 
 ```
 +---------------------------------------------------------------+
 | Bytes 0..2  | Magic Header: "GVM" (ASCII)                     |
-| Byte 3      | Container Version: 0x01 (uint8)                 |
+| Byte 3      | Container Version: 0x01 (v1) or 0x02 (v2)       |
 | Bytes 4..7  | Instruction Count: uint32 (Little-Endian)       |
 +---------------------------------------------------------------+
 | Instruction Records (repeated `Count` times):                 |
@@ -52,10 +52,10 @@ Common Base36 opcodes and their byte values:
 - `02` (`0x02`, 2): `WRITE`
 - `03` (`0x03`, 3): `STORE`
 - `04` (`0x04`, 4): `DEL`
-- `05` (`0x05`, 5): `ADD`
-- `06` (`0x06`, 6): `SUB`
-- `07` (`0x07`, 7): `MUL`
-- `08` (`0x08`, 8): `DIV`
+- `05` (`0x05`, 5): `ADD` (Tagged 3-address: `SRC1, SRC2, DEST`)
+- `06` (`0x06`, 6): `SUB` (Tagged 3-address: `SRC1, SRC2, DEST`)
+- `07` (`0x07`, 7): `MUL` (Tagged 3-address: `SRC1, SRC2, DEST`)
+- `08` (`0x08`, 8): `DIV` (Tagged 3-address: `SRC1, SRC2, DEST`)
 - `0A` (`0x0A`, 10): `COPY`
 - `0B` (`0x0B`, 11): `JMP`
 - `0C` (`0x0C`, 12): `JNZ`
@@ -64,8 +64,8 @@ Common Base36 opcodes and their byte values:
 - `0F` (`0x0F`, 15): `DEC`
 - `0J` (`0x13`, 19): `LBL`
 - `0L` (`0x15`, 21): `EXIT`
-- `0M` (`0x16`, 22): `LT`
-- `0N` (`0x17`, 23): `GT`
+- `0M` (`0x16`, 22): `LT` (3-address: `SRC1, SRC2, DEST`)
+- `0N` (`0x17`, 23): `GT` (3-address: `SRC1, SRC2, DEST`)
 - `0P` (`0x19`, 25): `JF`
 - `1A` (`0x2E`, 46): `PUSH`
 - `1B` (`0x2F`, 47): `CALL`
@@ -78,18 +78,44 @@ Common Base36 opcodes and their byte values:
 - `22` (`0x4A`, 74): `MGET`
 - `23` (`0x4B`, 75): `MLEN`
 - `30` (`0x6C`, 108): `NEWARR`
-- `40` (`0x90`, 144): `MOV`
+- `40` (`0x90`, 144): `MOV` (`DEST, SRC`)
 - `41` (`0x91`, 145): `NSUB`
 - `42` (`0x92`, 146): `NADD`
+- `43` (`0x93`, 147): `IADD` (Raw 64-bit untagged: `SRC1, SRC2, DEST`)
+- `44` (`0x94`, 148): `ISUB` (Raw 64-bit untagged: `SRC1, SRC2, DEST`)
+- `45` (`0x95`, 149): `IMUL` (Raw 64-bit untagged: `SRC1, SRC2, DEST`)
+- `46` (`0x96`, 150): `IDIV` (Raw 64-bit untagged: `SRC1, SRC2, DEST`)
 
-### 2.2 Operands & Memory Representation
-Every instruction requires exactly 3 operands (unused operands should be set to `"00"` or `"0"`):
+### 2.2 The 16-Register Architecture (`r0`..`r15`)
 
+GravityVM provides 16 general-purpose 64-bit registers:
+
+| Register | Role | x86_64 Mapping | AArch64 Mapping | Preservation |
+| :--- | :--- | :--- | :--- | :--- |
+| **`r0`** | Primary Accumulator / Return (`sra` alias) | `%rax` | `x0` | Caller-Saved |
+| **`r1`** | Function Argument 0 / Scratch | `%rdi` | `x1` | Caller-Saved |
+| **`r2`** | Function Argument 1 / Scratch | `%rsi` | `x2` | Caller-Saved |
+| **`r3`** | Function Argument 2 / Scratch | `%rdx` | `x3` | Caller-Saved |
+| **`r4`** | Function Argument 3 / Scratch | `%rcx` | `x4` | Caller-Saved |
+| **`r5`** | Function Argument 4 / Scratch | `%r8` | `x5` | Caller-Saved |
+| **`r6`** | Function Argument 5 / Scratch | `%r9` | `x6` | Caller-Saved |
+| **`r7`** | General Scratch Temporary | `%r10` | `x7` | Caller-Saved |
+| **`r8`** | General Scratch Temporary | `%r11` | `x8` | Caller-Saved |
+| **`r9`** | Long-Lived / Local Variable | `%rbx` | `x9` | **Callee-Saved (Preserved)** |
+| **`r10`** | Long-Lived / Local Variable | `%r12` | `x10` | **Callee-Saved (Preserved)** |
+| **`r11`** | Long-Lived / Local Variable | `%r13` | `x11` | **Callee-Saved (Preserved)** |
+| **`r12`** | Long-Lived / Local Variable | `%r14` | `x12` | **Callee-Saved (Preserved)** |
+| **`r13`** | Long-Lived / Local Variable | `%r15` | `x13` | **Callee-Saved (Preserved)** |
+| **`r14`** | Local Frame Variable Slot 1 | `$-8(%rbp)` | `x14` | Stack-Preserved |
+| **`r15`** | Local Frame Variable Slot 2 | `$-16(%rbp)` | `x15` | Stack-Preserved |
+
+### 2.3 Operands & 3-Address Code Convention
+Every instruction takes 3 operands: `(OP SRC1, SRC2, R_DEST)`:
+- If `R_DEST` is omitted or `"00"`, the result defaults to accumulator `r0` (preserving compatibility with legacy stack code).
 - **Literals**: Prefix with `$` (e.g., `$10`, `$55`).
+- **Registers**: `r0` through `r15` (or legacy `sra`, `srb`, `src`, `srd`, `sre`).
 - **Global Variables**: Prefix with `@` (e.g., `@01`, `@my_var`).
 - **Stack Offsets**: Standard SysV base-pointer offsets (e.g., `$-8(%rbp)`, `$-16(%rbp)`).
-- **Virtual Stack Push / Pop Offsets**: `528`, `48` (byte counts div 8).
-- **Registers**: Standard virtual registers (`sra`, `srb`, `src`, `srd`, `sre`, `srnl`) or architecture registers (`%rdi`, `%rsi`, `%rax`).
 - **Labels**: Wrapped in brackets (e.g., `[ENTRY]`, `[L500]`, `[F_main]`).
 
 ---
@@ -114,13 +140,15 @@ OPCODES = {
     "COPY": 10, "JMP": 11, "JNZ": 12, "CMP": 13, "INC": 14, "DEC": 15,
     "UPD": 16, "MALLOC": 17, "FREE": 18, "LBL": 19, "EXIT": 21,
     "LT": 22, "GT": 23, "ITS": 24, "JF": 25, "TYPEOF": 29,
+    "IADD": 43, "ISUB": 44, "IMUL": 45, "IDIV": 46,
     "PUSH": 46, "CALL": 47, "RET": 48, "GETARG": 49, "STR": 50,
     "WRITES": 51, "NEWMAP": 72, "MSET": 73, "MGET": 74, "MLEN": 75,
     "NEWARR": 108, "MOV": 144, "NSUB": 145, "NADD": 146
 }
 
 class GvmEmitter:
-    def __init__(self):
+    def __init__(self, version: int = 2):
+        self.version = version
         self.instructions = []
 
     def emit(self, opcode: str, arg0: str = "00", arg1: str = "00", arg2: str = "00"):
@@ -145,9 +173,9 @@ class GvmEmitter:
     def write_file(self, filename: str):
         """Serializes bytecode into the binary GVM container format."""
         with open(filename, "wb") as f:
-            # 1. Magic Header "GVM" + Version 1
+            # 1. Magic Header "GVM" + Version (1 = Stack VM, 2 = 16-Register 3-Address VM)
             f.write(b"GVM")
-            f.write(struct.pack("B", 1))
+            f.write(struct.pack("B", self.version))
 
             # 2. Instruction Count (uint32 Little-Endian)
             f.write(struct.pack("<I", len(self.instructions)))
@@ -159,16 +187,16 @@ class GvmEmitter:
                     b_arg = arg.encode("ascii")
                     f.write(struct.pack("B", len(b_arg)))
                     f.write(b_arg)
-        print(f"Successfully generated {filename} ({len(self.instructions)} instructions)")
+        print(f"Successfully generated {filename} ({len(self.instructions)} instructions, v{self.version})")
 ```
 
-### 3.2 Complete Example: Emitting a Working Program
+### 3.2 Complete Example: Emitting a Register-Based Program (v2)
 
-Here is an example program that defines an entrypoint, stores variables, performs tagged arithmetic, and exits:
+Here is a complete program demonstrating GVM 2.0 register-based emission:
 
 ```python
 def generate_sample_program():
-    gvm = GvmEmitter()
+    gvm = GvmEmitter(version=2)
 
     # Reserve initial memory pools (local, global, buffer)
     gvm.emit("MALLOC", "$00", "128", "00")
@@ -181,17 +209,20 @@ def generate_sample_program():
 
     # Start main function
     gvm.label("F_main")
-    # Store tagged integer 10 (tagged as 21) into global @01
-    gvm.emit("STORE", "@01", str(gvm.tag(10)))
 
-    # Store tagged integer 45 (tagged as 91) into global @02
-    gvm.emit("STORE", "@02", str(gvm.tag(45)))
+    # Load immediate tagged values directly into hardware registers r1 and r2
+    # tag(10) -> 21, tag(45) -> 91
+    gvm.emit("MOV", "r1", f"${gvm.tag(10)}", "00")
+    gvm.emit("MOV", "r2", f"${gvm.tag(45)}", "00")
 
-    # Perform tagged addition: sra = @01 + @02
-    gvm.emit("ADD", "@01", "@02", "sra")
+    # 3-address tagged addition: r3 = r1 + r2
+    gvm.emit("ADD", "r1", "r2", "r3")
+
+    # Also move to return/accumulator register r0 (sra)
+    gvm.emit("MOV", "r0", "r3", "00")
 
     # Write output to STDOUT
-    gvm.emit("WRITE", "[sra]", "00", "00")
+    gvm.emit("WRITE", "[r0]", "00", "00")
     gvm.emit("WRITE", "[srnl]", "00", "00")
 
     # Return from F_main
@@ -213,6 +244,11 @@ if __name__ == "__main__":
 Once your compiler has output `hello_byob.gvt`:
 
 ```bash
+# Execute in-process without any external toolchain or runtime library:
+./gvm interpret -i:hello_byob.gvt
+# or
+./gvm -b:interp -i:hello_byob.gvt
+
 # Compile and run natively
 ./gvm run -i:hello_byob.gvt
 
@@ -220,6 +256,7 @@ Once your compiler has output `hello_byob.gvt`:
 ./gvm build -b:lua -i:hello_byob.gvt -o:prog.lua && lua prog.lua
 ./gvm build -b:python -i:hello_byob.gvt -o:prog.py && python3 prog.py
 ./gvm build -b:javascript -i:hello_byob.gvt -o:prog.js && node prog.js
+./gvm build -b:c -i:hello_byob.gvt -o:prog.c && clang prog.c -o prog && ./prog
 ```
 
 ---
@@ -232,10 +269,11 @@ For high-performance compilers written in Nim:
 import streams, tables
 
 type GvmEmitter* = ref object
+  version*: uint8
   instructions: seq[tuple[op: uint8, a0, a1, a2: string]]
 
-proc newGvmEmitter*(): GvmEmitter =
-  GvmEmitter(instructions: @[])
+proc newGvmEmitter*(version: uint8 = 2): GvmEmitter =
+  GvmEmitter(version: version, instructions: @[])
 
 proc emit*(self: GvmEmitter, op: uint8, a0 = "00", a1 = "00", a2 = "00") =
   self.instructions.add((op, a0, a1, a2))
@@ -244,9 +282,9 @@ proc writeGvt*(self: GvmEmitter, filename: string) =
   var strm = newFileStream(filename, fmWrite)
   defer: strm.close()
 
-  # Write Header
+  # Write Header: Magic "GVM", Version (1 or 2), Instruction Count (uint32 LE)
   strm.write("GVM")
-  strm.write(uint8(1))
+  strm.write(self.version)
   strm.write(uint32(self.instructions.len))
 
   # Write Instructions
@@ -261,7 +299,10 @@ proc writeGvt*(self: GvmEmitter, filename: string) =
 
 ## 5. Summary Checklist for Frontend Authors
 
-1. **Emit Header**: Always start with `GVM` + `\x01` + `uint32(count)`.
+1. **Emit Header**: Always start with `GVM` + Version byte (`\x02` for Register VM, `\x01` for legacy Stack VM) + `uint32(count)`.
 2. **Setup Entrypoint**: Emit `[ENTRY]` -> `[L500]` -> `[F_main]`.
-3. **Use Tagged Arithmetic**: For integers, use `(x * 2) + 1` so GravityVM's runtime functions can distinguish scalars from pointers without boxing.
-4. **Link Native Runtimes When Necessary**: If your language requires custom heap objects, IO procedures, or external C bindings, compile them into an object file (`.o`) and pass `-l:/path/to/my_runtime.o` when compiling natively.
+3. **Use Register File `r0`..`r15`**: Take advantage of 3-address instructions (`ADD r1, r2, r3` or `IADD r1, r2, r3`) to keep variables directly in hardware CPU registers without stack pushes or memory memory trips.
+4. **Use Tagged Arithmetic or Raw Ints**:
+   - Use tagged arithmetic (`ADD`, `SUB`, `MUL`, `DIV`) with `(x * 2) + 1` if your runtime expects Newton-compatible tagged pointers/integers.
+   - Use raw 64-bit integer arithmetic (`IADD`, `ISUB`, `IMUL`, `IDIV`) for high-performance untagged computation.
+5. **Link Native Runtimes When Necessary**: If your language requires custom heap objects, IO procedures, or external C bindings, compile them into an object file (`.o`) and pass `-l:/path/to/my_runtime.o` when compiling natively.

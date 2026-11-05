@@ -25,7 +25,9 @@ proc resolveC(arg: string): string =
         except:
             return "stack[rbp]"
 
-    if cleanArg == "%rax": return "sra"
+    if cleanArg == "%rax" or cleanArg == "sra" or cleanArg == "r0": return "r0"
+    if cleanArg in ["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
+        return cleanArg
     if cleanArg == "%rbx": return "srb"
     if cleanArg == "%rcx": return "src"
     if cleanArg == "%rdx": return "srd"
@@ -72,23 +74,23 @@ vm_transpiler_c["CALL"] = proc(d0, d1, d2: string): string =
         s &= retLabel & ":\n"
         if argCount > 0:
             s &= "    rsp += " & $argCount & ";\n"
-        if d2 != "" and d2 != "00":
-            s &= "    " & resolveC(d2) & " = sra;\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "    " & resolveC(d2) & " = r0;\n"
         return s
     else:
         # External runtime function call
         var s = "    extern long long " & funcLabel & "(long long, long long, long long, long long, long long, long long);\n"
-        s &= "    sra = (long long)" & funcLabel & "(reg_rdi, reg_rsi, srd, src, reg_r8, reg_r9);\n"
+        s &= "    r0 = (long long)" & funcLabel & "(reg_rdi, reg_rsi, srd, src, reg_r8, reg_r9);\n"
         if argCount > 0:
             s &= "    rsp += " & $argCount & ";\n"
-        if d2 != "" and d2 != "00":
-            s &= "    " & resolveC(d2) & " = sra;\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "    " & resolveC(d2) & " = r0;\n"
         return s
 
 vm_transpiler_c["RET"] = proc(d0, d1, d2: string): string =
     var s = ""
     if d0 != "" and d0 != "0" and d0 != "00":
-        s &= "    sra = " & resolveC(d0) & ";\n"
+        s &= "    r0 = " & resolveC(d0) & ";\n"
 
     # Function epilogue & computed goto return
     s &= "    rsp = rbp;\n"
@@ -113,17 +115,39 @@ vm_transpiler_c["STORE"] = proc(d0, d1, d2: string): string =
     return "    " & dest & " = " & src & ";\n"
 
 vm_transpiler_c["ADD"] = proc(d0, d1, d2: string): string =
-    return "    sra = TAG(UNTAG(" & resolveC(d0) & ") + UNTAG(" & resolveC(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = TAG(UNTAG(" & resolveC(d0) & ") + UNTAG(" & resolveC(d1) & "));\n"
 
 vm_transpiler_c["SUB"] = proc(d0, d1, d2: string): string =
-    return "    sra = TAG(UNTAG(" & resolveC(d0) & ") - UNTAG(" & resolveC(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = TAG(UNTAG(" & resolveC(d0) & ") - UNTAG(" & resolveC(d1) & "));\n"
 
 vm_transpiler_c["MUL"] = proc(d0, d1, d2: string): string =
-    return "    sra = TAG(UNTAG(" & resolveC(d0) & ") * UNTAG(" & resolveC(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = TAG(UNTAG(" & resolveC(d0) & ") * UNTAG(" & resolveC(d1) & "));\n"
 
 vm_transpiler_c["DIV"] = proc(d0, d1, d2: string): string =
-    var s = "    if (UNTAG(" & resolveC(d1) & ") == 0) sra = TAG(0);\n"
-    s &= "    else sra = TAG(UNTAG(" & resolveC(d0) & ") / UNTAG(" & resolveC(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    var s = "    if (UNTAG(" & resolveC(d1) & ") == 0) " & dest & " = TAG(0);\n"
+    s &= "    else " & dest & " = TAG(UNTAG(" & resolveC(d0) & ") / UNTAG(" & resolveC(d1) & "));\n"
+    return s
+
+vm_transpiler_c["IADD"] = proc(d0, d1, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (" & resolveC(d0) & ") + (" & resolveC(d1) & ");\n"
+
+vm_transpiler_c["ISUB"] = proc(d0, d1, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (" & resolveC(d0) & ") - (" & resolveC(d1) & ");\n"
+
+vm_transpiler_c["IMUL"] = proc(d0, d1, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (" & resolveC(d0) & ") * (" & resolveC(d1) & ");\n"
+
+vm_transpiler_c["IDIV"] = proc(d0, d1, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    var s = "    if ((" & resolveC(d1) & ") == 0) " & dest & " = 0;\n"
+    s &= "    else " & dest & " = (" & resolveC(d0) & ") / (" & resolveC(d1) & ");\n"
     return s
 
 vm_transpiler_c["INC"] = proc(d0, d1, d2: string): string =
@@ -133,31 +157,29 @@ vm_transpiler_c["DEC"] = proc(d0, d1, d2: string): string =
     return "    " & resolveC(d0) & " -= 2;\n"
 
 vm_transpiler_c["LT"] = proc(d0, d1, d2: string): string =
-    var s = "    sra = (UNTAG(" & resolveC(d0) & ") < UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveC(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (UNTAG(" & resolveC(d0) & ") < UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
 
 vm_transpiler_c["GT"] = proc(d0, d1, d2: string): string =
-    var s = "    sra = (UNTAG(" & resolveC(d0) & ") > UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveC(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (UNTAG(" & resolveC(d0) & ") > UNTAG(" & resolveC(d1) & ")) ? 3 : 1;\n"
 
 vm_transpiler_c["EQ"] = proc(d0, d1, d2: string): string =
-    var s = "    sra = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "    " & resolveC(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 3 : 1;\n"
+
+vm_transpiler_c["CMP"] = proc(d0, d1, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveC(d2) else: "r0"
+    return "    " & dest & " = (" & resolveC(d0) & " == " & resolveC(d1) & ") ? 3 : 1;\n"
 
 vm_transpiler_c["JMP"] = proc(d0, d1, d2: string): string =
     return "    goto " & d0.replace("[", "").replace("]", "") & ";\n"
 
 vm_transpiler_c["JNZ"] = proc(d0, d1, d2: string): string =
-    return "    if (sra == 3) goto " & d0 & ";\n"
+    return "    if (r0 == 3 || (r0 != 0 && r0 != 1)) goto " & d0.replace("[", "").replace("]", "") & ";\n"
 
 vm_transpiler_c["JEZ"] = proc(d0, d1, d2: string): string =
-    return "    if (sra == 0) goto " & d0.replace("[", "").replace("]", "") & ";\n"
+    return "    if (r0 == 0 || r0 == 1) goto " & d0.replace("[", "").replace("]", "") & ";\n"
 
 vm_transpiler_c["STR"] = proc(d0, d1, d2: string): string =
     var hex = d1.replace("[", "").replace("]", "")
@@ -185,9 +207,16 @@ vm_transpiler_c["FOPEN"] = proc(d0, d1, d2: string): string =
     return s
 
 vm_transpiler_c["EXIT"] = proc(d0, d1, d2: string): string =
-    if current_label != "L500":
+    if current_label == "L500":
+        inc labelCounter
+        let retLabel = "RET_ADDR_EXIT_" & $labelCounter
+        var s = "    stack[--rsp] = (long long)&&" & retLabel & ";\n"
+        s &= "    goto F_main;\n"
+        s &= retLabel & ":\n"
+        s &= "    exit(UNTAG(" & resolveC(d0) & "));\n"
+        return s
+    else:
         return "    exit(UNTAG(" & resolveC(d0) & "));\n"
-    return ""
 
 vm_transpiler_c["MALLOC"] = proc(d0, d1, d2: string): string = return "    // [MALLOC]\n"
 

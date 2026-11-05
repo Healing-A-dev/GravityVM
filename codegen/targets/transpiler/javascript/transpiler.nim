@@ -10,7 +10,9 @@ proc resolveJs(arg: string): string =
     if arg.len == 0 or arg == "0": return "0"
     let cleanArg = arg.strip().replace("!", "").replace("[", "").replace("]", "")
 
-    if cleanArg == "%rax" or cleanArg == "sra": return "sra"
+    if cleanArg == "%rax" or cleanArg == "sra" or cleanArg == "r0": return "r0"
+    if cleanArg in ["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
+        return cleanArg
     if cleanArg == "%rbx" or cleanArg == "srb": return "srb"
     if cleanArg == "%rcx" or cleanArg == "src": return "src"
     if cleanArg == "%rdx" or cleanArg == "srd": return "srd"
@@ -91,19 +93,40 @@ vm_transpiler_javascript["UPD"] = proc(d0: string, d1: string, d2: string): stri
 
 # --- Math ---
 vm_transpiler_javascript["ADD"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolveJs(d0) & ") + UNTAG(" & resolveJs(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolveJs(d0) & ") + UNTAG(" & resolveJs(d1) & "));\n"
 
 vm_transpiler_javascript["SUB"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolveJs(d0) & ") - UNTAG(" & resolveJs(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolveJs(d0) & ") - UNTAG(" & resolveJs(d1) & "));\n"
 
 vm_transpiler_javascript["MUL"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolveJs(d0) & ") * UNTAG(" & resolveJs(d1) & "));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolveJs(d0) & ") * UNTAG(" & resolveJs(d1) & "));\n"
 
 vm_transpiler_javascript["DIV"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(Math.floor(UNTAG(" & resolveJs(d0) & ") / UNTAG(" & resolveJs(d1) & ")));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = TAG(Math.floor(UNTAG(" & resolveJs(d0) & ") / UNTAG(" & resolveJs(d1) & ")));\n"
 
 vm_transpiler_javascript["EXP"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(Math.floor(Math.pow(UNTAG(" & resolveJs(d0) & "), UNTAG(" & resolveJs(d1) & "))));\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = TAG(Math.floor(Math.pow(UNTAG(" & resolveJs(d0) & "), UNTAG(" & resolveJs(d1) & "))));\n"
+
+vm_transpiler_javascript["IADD"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = ((" & resolveJs(d0) & ") + (" & resolveJs(d1) & ")) | 0;\n"
+
+vm_transpiler_javascript["ISUB"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = ((" & resolveJs(d0) & ") - (" & resolveJs(d1) & ")) | 0;\n"
+
+vm_transpiler_javascript["IMUL"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = Math.imul(" & resolveJs(d0) & ", " & resolveJs(d1) & ");\n"
+
+vm_transpiler_javascript["IDIV"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = Math.trunc((" & resolveJs(d0) & ") / (" & resolveJs(d1) & "));\n"
 
 vm_transpiler_javascript["COPY"] = proc(d0: string, d1: string, d2: string): string =
     return "            " & resolveJs(d1) & " = " & resolveJs(d0) & ";\n"
@@ -131,21 +154,19 @@ vm_transpiler_javascript["JMP"] = proc(d0: string, d1: string, d2: string): stri
 
 vm_transpiler_javascript["JNZ"] = proc(d0: string, d1: string, d2: string): string =
     let target = resolveJs(d0).replace("[", "").replace("]", "")
-    return "                if (sra === 3) { pc = \"" & target & "\"; break; }\n"
+    return "                if (r0 === 3 || (r0 !== 0 && r0 !== 1)) { pc = \"" & target & "\"; break; }\n"
 
 vm_transpiler_javascript["JEZ"] = proc(d0: string, d1: string, d2: string): string =
     let target = resolveJs(d0).replace("[", "").replace("]", "")
-    return "                if (sra === 0 || sra === 1) { pc = \"" & target & "\"; break; }\n"
+    return "                if (r0 === 0 || r0 === 1) { pc = \"" & target & "\"; break; }\n"
 
 vm_transpiler_javascript["JF"] = proc(d0, d1, d2: string): string =
     let target = resolveJs(d1).replace("[", "").replace("]", "")
     return "                if (" & resolveJs(d0) & " === 1) { pc = \"" & target & "\"; break; }\n"
 
 vm_transpiler_javascript["CMP"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = (" & resolveJs(d0) & " === " & resolveJs(d1) & ") ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolveJs(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = (" & resolveJs(d0) & " === " & resolveJs(d1) & ") ? 3 : 1;\n"
 
 vm_transpiler_javascript["EXIT"] = proc(d0: string, d1: string, d2: string): string =
     inc labelCounter
@@ -166,22 +187,16 @@ vm_transpiler_javascript["DEC"] = proc(d0: string, d1: string, d2: string): stri
     return "            " & target & " -= 2;\n"
 
 vm_transpiler_javascript["LT"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = (UNTAG(" & resolveJs(d0) & ") < UNTAG(" & resolveJs(d1) & ")) ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolveJs(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = (UNTAG(" & resolveJs(d0) & ") < UNTAG(" & resolveJs(d1) & ")) ? 3 : 1;\n"
 
 vm_transpiler_javascript["GT"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = (UNTAG(" & resolveJs(d0) & ") > UNTAG(" & resolveJs(d1) & ")) ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolveJs(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = (UNTAG(" & resolveJs(d0) & ") > UNTAG(" & resolveJs(d1) & ")) ? 3 : 1;\n"
 
 vm_transpiler_javascript["EQ"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = (" & resolveJs(d0) & " === " & resolveJs(d1) & ") ? 3 : 1;\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolveJs(d2) & " = sra;\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolveJs(d2) else: "r0"
+    return "            " & dest & " = (" & resolveJs(d0) & " === " & resolveJs(d1) & ") ? 3 : 1;\n"
 
 # --- Function & Stack ---
 vm_transpiler_javascript["PUSH"] = proc(d0: string, d1: string, d2: string): string =
@@ -200,19 +215,19 @@ vm_transpiler_javascript["CALL"] = proc(d0: string, d1: string, d2: string): str
         except: discard
         if argCount > 0:
             s &= "            rsp += " & $argCount & ";\n"
-        if d2 != "" and d2 != "00":
-            s &= "            " & resolveJs(d2) & " = sra;\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "            " & resolveJs(d2) & " = r0;\n"
         return s
     else:
-        var s = "            sra = gvm_runtime[\"" & funcLabel & "\"]();\n"
-        if d2 != "" and d2 != "00":
-            s &= "            " & resolveJs(d2) & " = sra;\n"
+        var s = "            r0 = gvm_runtime[\"" & funcLabel & "\"]();\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "            " & resolveJs(d2) & " = r0;\n"
         return s
 
 vm_transpiler_javascript["RET"] = proc(d0: string, d1: string, d2: string): string =
     var s = ""
     if d0 != "" and d0 != "0" and d0 != "00":
-        s &= "            sra = " & resolveJs(d0) & ";\n"
+        s &= "            r0 = " & resolveJs(d0) & ";\n"
     s &= "            rsp = rbp; rbp = stack[rsp++]; pc = stack[rsp++]; break;\n"
     return s
 
@@ -264,7 +279,8 @@ vm_transpiler_javascript["STR"] = proc(d0, d1, d2: string): string =
             try: text.add(chr(parseHexInt(hexContent[i .. i+1])))
             except: discard
     let label = d0.replace("$", "").replace("!", "").replace("[", "").replace("]", "")
-    return "    const " & label & " = \"" & text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") & "\";\n"
+    let escaped = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    return "    const " & label & " = \"" & escaped & "\";\n"
 
 vm_transpiler_javascript["CAT"] = proc(d0, d1, d2: string): string =
     return "            " & resolveJs(d0) & " = gvm_str_cat(" & resolveJs(d1) & ", " & resolveJs(d2) & ");\n"

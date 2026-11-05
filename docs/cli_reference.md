@@ -12,6 +12,7 @@ gvm <command> [options] [flags]
 
 | Command | Description |
 |---|---|
+| `interpret` | Directly executes bytecode in-process without external compilers, assemblers, or linkers. |
 | `build` | Compiles the input `.gvt` bytecode file to the designated target output. |
 | `run` | Compiles and immediately executes the target binary or script. |
 | `generate-object` | Compiles the bytecode into a relocatable machine object file (`.o`). |
@@ -35,15 +36,19 @@ Specifies the destination output file name. If omitted, defaults to the base nam
 ```
 
 ### `-b:<target>` (Optional, Default: `native`)
-Selects the compilation backend or transpilation target:
+Selects the compilation backend, transpilation target, or in-process execution:
 - `native`: Compiles directly to native host assembly (x86_64 or AArch64).
+- `interp`: Runs directly in the in-process register VM without clang/gcc or external libraries.
 - `c`: Transpiles to optimized C source and compiles via Clang/GCC.
 - `lua`: Transpiles to standalone Lua 5.4 script.
 - `python` / `py`: Transpiles to standalone Python 3 script.
 - `javascript` / `js`: Transpiles to standalone Node.js script.
 
 ```bash
-./gvm build -b:lua -i:main.gvt -o:app.lua
+# In-process direct interpretation
+./gvm interpret -i:main.gvt
+# or
+./gvm -b:interp -i:main.gvt
 ```
 
 ### `-f:<target>` (Optional)

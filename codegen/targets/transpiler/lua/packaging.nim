@@ -1,5 +1,7 @@
 const lua_setup*: string = """
----| Required Functions & Variables |---
+--- | Required Functions & Variables |---
+local r0, r1, r2, r3, r4, r5, r6, r7 = 0, 0, 0, 0, 0, 0, 0, 0
+local r8, r9, r10, r11, r12, r13, r14, r15 = 0, 0, 0, 0, 0, 0, 0, 0
 local sra = 0
 local srb = 0
 local src = 0

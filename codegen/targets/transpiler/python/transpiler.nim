@@ -10,7 +10,9 @@ proc resolvePy(arg: string): string =
     if arg.len == 0 or arg == "0": return "0"
     let cleanArg = arg.strip().replace("!", "").replace("[", "").replace("]", "")
 
-    if cleanArg == "%rax" or cleanArg == "sra": return "sra"
+    if cleanArg == "%rax" or cleanArg == "sra" or cleanArg == "r0": return "r0"
+    if cleanArg in ["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
+        return cleanArg
     if cleanArg == "%rbx" or cleanArg == "srb": return "srb"
     if cleanArg == "%rcx" or cleanArg == "src": return "src"
     if cleanArg == "%rdx" or cleanArg == "srd": return "srd"
@@ -93,19 +95,40 @@ vm_transpiler_python["UPD"] = proc(d0: string, d1: string, d2: string): string =
 
 # --- Math ---
 vm_transpiler_python["ADD"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolvePy(d0) & ") + UNTAG(" & resolvePy(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolvePy(d0) & ") + UNTAG(" & resolvePy(d1) & "))\n"
 
 vm_transpiler_python["SUB"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolvePy(d0) & ") - UNTAG(" & resolvePy(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolvePy(d0) & ") - UNTAG(" & resolvePy(d1) & "))\n"
 
 vm_transpiler_python["MUL"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolvePy(d0) & ") * UNTAG(" & resolvePy(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolvePy(d0) & ") * UNTAG(" & resolvePy(d1) & "))\n"
 
 vm_transpiler_python["DIV"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolvePy(d0) & ") // UNTAG(" & resolvePy(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolvePy(d0) & ") // UNTAG(" & resolvePy(d1) & "))\n"
 
 vm_transpiler_python["EXP"] = proc(d0: string, d1: string, d2: string): string =
-    return "            sra = TAG(UNTAG(" & resolvePy(d0) & ") ** UNTAG(" & resolvePy(d1) & "))\n"
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = TAG(UNTAG(" & resolvePy(d0) & ") ** UNTAG(" & resolvePy(d1) & "))\n"
+
+vm_transpiler_python["IADD"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = int((" & resolvePy(d0) & ") + (" & resolvePy(d1) & "))\n"
+
+vm_transpiler_python["ISUB"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = int((" & resolvePy(d0) & ") - (" & resolvePy(d1) & "))\n"
+
+vm_transpiler_python["IMUL"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = int((" & resolvePy(d0) & ") * (" & resolvePy(d1) & "))\n"
+
+vm_transpiler_python["IDIV"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = int((" & resolvePy(d0) & ") // (" & resolvePy(d1) & "))\n"
 
 vm_transpiler_python["COPY"] = proc(d0: string, d1: string, d2: string): string =
     return "            " & resolvePy(d1) & " = " & resolvePy(d0) & "\n"
@@ -132,21 +155,19 @@ vm_transpiler_python["JMP"] = proc(d0: string, d1: string, d2: string): string =
 
 vm_transpiler_python["JNZ"] = proc(d0: string, d1: string, d2: string): string =
     let target = resolvePy(d0).replace("[", "").replace("]", "")
-    return "            if sra == 3: pc = \"" & target & "\"; continue\n"
+    return "            if r0 == 3 or (r0 != 0 and r0 != 1): pc = \"" & target & "\"; continue\n"
 
 vm_transpiler_python["JEZ"] = proc(d0: string, d1: string, d2: string): string =
     let target = resolvePy(d0).replace("[", "").replace("]", "")
-    return "            if sra == 0 or sra == 1: pc = \"" & target & "\"; continue\n"
+    return "            if r0 == 0 or r0 == 1: pc = \"" & target & "\"; continue\n"
 
 vm_transpiler_python["JF"] = proc(d0, d1, d2: string): string =
     let target = resolvePy(d1).replace("[", "").replace("]", "")
     return "            if " & resolvePy(d0) & " == 1: pc = \"" & target & "\"; continue\n"
 
 vm_transpiler_python["CMP"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = 3 if (" & resolvePy(d0) & " == " & resolvePy(d1) & ") else 1\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolvePy(d2) & " = sra\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = 3 if (" & resolvePy(d0) & " == " & resolvePy(d1) & ") else 1\n"
 
 vm_transpiler_python["EXIT"] = proc(d0: string, d1: string, d2: string): string =
     inc labelCounter
@@ -167,22 +188,16 @@ vm_transpiler_python["DEC"] = proc(d0: string, d1: string, d2: string): string =
     return "            " & target & " -= 2\n"
 
 vm_transpiler_python["LT"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = 3 if (UNTAG(" & resolvePy(d0) & ") < UNTAG(" & resolvePy(d1) & ")) else 1\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolvePy(d2) & " = sra\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = 3 if (UNTAG(" & resolvePy(d0) & ") < UNTAG(" & resolvePy(d1) & ")) else 1\n"
 
 vm_transpiler_python["GT"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = 3 if (UNTAG(" & resolvePy(d0) & ") > UNTAG(" & resolvePy(d1) & ")) else 1\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolvePy(d2) & " = sra\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = 3 if (UNTAG(" & resolvePy(d0) & ") > UNTAG(" & resolvePy(d1) & ")) else 1\n"
 
 vm_transpiler_python["EQ"] = proc(d0: string, d1: string, d2: string): string =
-    var s = "            sra = 3 if (" & resolvePy(d0) & " == " & resolvePy(d1) & ") else 1\n"
-    if d2 != "" and d2 != "00":
-        s &= "            " & resolvePy(d2) & " = sra\n"
-    return s
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolvePy(d2) else: "r0"
+    return "            " & dest & " = 3 if (" & resolvePy(d0) & " == " & resolvePy(d1) & ") else 1\n"
 
 # --- Function & Stack ---
 vm_transpiler_python["PUSH"] = proc(d0: string, d1: string, d2: string): string =
@@ -201,19 +216,19 @@ vm_transpiler_python["CALL"] = proc(d0: string, d1: string, d2: string): string 
         except: discard
         if argCount > 0:
             s &= "            rsp += " & $argCount & "\n"
-        if d2 != "" and d2 != "00":
-            s &= "            " & resolvePy(d2) & " = sra\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "            " & resolvePy(d2) & " = r0\n"
         return s
     else:
-        var s = "            sra = gvm_runtime[\"" & funcLabel & "\"]()\n"
-        if d2 != "" and d2 != "00":
-            s &= "            " & resolvePy(d2) & " = sra\n"
+        var s = "            r0 = gvm_runtime[\"" & funcLabel & "\"]()\n"
+        if d2 != "" and d2 != "00" and d2 != "0":
+            s &= "            " & resolvePy(d2) & " = r0\n"
         return s
 
 vm_transpiler_python["RET"] = proc(d0: string, d1: string, d2: string): string =
     var s = ""
     if d0 != "" and d0 != "0" and d0 != "00":
-        s &= "            sra = " & resolvePy(d0) & "\n"
+        s &= "            r0 = " & resolvePy(d0) & "\n"
     s &= "            rsp = rbp; rbp = stack[rsp]; rsp += 1; pc = stack[rsp]; rsp += 1; continue\n"
     return s
 
@@ -265,7 +280,8 @@ vm_transpiler_python["STR"] = proc(d0, d1, d2: string): string =
             try: text.add(chr(parseHexInt(hexContent[i .. i+1])))
             except: discard
     let label = d0.replace("$", "").replace("!", "").replace("[", "").replace("]", "")
-    return "    " & label & " = \"" & text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") & "\"\n"
+    let escaped = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    return "    " & label & " = \"" & escaped & "\"\n"
 
 vm_transpiler_python["CAT"] = proc(d0, d1, d2: string): string =
     return "            " & resolvePy(d0) & " = gvm_str_cat(" & resolvePy(d1) & ", " & resolvePy(d2) & ")\n"

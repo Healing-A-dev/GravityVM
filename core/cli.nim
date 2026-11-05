@@ -12,6 +12,7 @@ var
     vm_file_in*: string = ""
     vm_build*: bool = false
     vm_run*: bool = false
+    vm_interpret*: bool = false
     vm_version*: string = c_version
     vm_execTarget*: string = "native"
     vm_execPlatform*: string = normalizePlatform(hostOS)
@@ -49,6 +50,7 @@ proc displayHelpMessage(): void =
     const message_body: seq[string] = @[
         "Commands:",
         "  disassemble            Disassembles the given file and displays each instruction",
+        "  interpret              Directly execute bytecode in the virtual machine",
         "  build                  Compile the given bytecode file",
         "  run                    Compile and run the given bytecode file",
         "  generate-object        Compile the given bytecode file to an object file",
@@ -101,13 +103,15 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     vm_file_in = C_setInputFile(fname)
 
                 # Target Language
-                elif (arg[0..1] == "b:"):
+                elif (arg.startsWith("b:")):
                     if arg.len < 3:
                         echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                         echo "|> Reason: Language argument expected after -b:"
                         quit()
                     let bLang = arg[2..<arg.len].toLowerAscii()
                     case bLang
+                    of "interp", "interpreter":
+                        vm_interpret = true
                     of "native":
                         vm_recompile = C_setState("recompile", true)
                         vm_execTarget = "native"
@@ -135,7 +139,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         quit()
 
                 # Fallbacks
-                elif (arg[0..1] == "f:"):
+                elif (arg.startsWith("f:")):
                     if arg.len < 3:
                         echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                         echo "|> Reason: Language argument expected after -f:"
@@ -159,7 +163,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         quit()
 
                 # Run Arguments:
-                elif (arg[0..1] == "a:"):
+                elif (arg.startsWith("a:")):
                     if arg.len < 3:
                         echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                         echo "|> Reason: Argument expected after -a:"
@@ -169,7 +173,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     vm_runarguments.add(runarg)
 
                 # Linker Files
-                elif (arg[0..1] == "l:"):
+                elif (arg.startsWith("l:")):
                     if arg.len < 3:
                        echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                        echo "|> Reason: Language argument expected after -l:"
@@ -189,7 +193,7 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                         C_setPlatform(vm_execArch, vm_execPlatform)
 
                 # Target Platform
-                elif (arg[0..1] == "p:"):
+                elif (arg.startsWith("p:")):
                     if arg.len < 3:
                       echo "\e[1mgravity: <\e[91mCLI-Error\e[0m\e[1m>\e[0m"
                       echo "|> Reason: Platform argument expected after -p:"
@@ -199,8 +203,16 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     if vm_execTarget == "native":
                         C_setPlatform(vm_execArch, vm_execPlatform)
 
+                # Run Shortcut
+                elif (arg == "r" or arg == "-r"):
+                    vm_run = C_setState("run", true)
+
+                # Interpret Shortcut
+                elif (arg == "interpret" or arg == "-interpret"):
+                    vm_interpret = true
+
                 # Help Message
-                elif (arg == "-help"):
+                elif (arg == "help" or arg == "-help"):
                     displayHelpMessage()
 
                 # Clean Up
@@ -213,28 +225,28 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                     vm_recompile = C_setState("recompile", true)
 
                 # Version
-                elif (arg == "-version"):
+                elif (arg == "version" or arg == "-version"):
                     echo "\e[1mgravity: \e[0m"
                     echo "|> Version: " & c_version
                     echo "|> Lisence: MIT 2025"
                     quit()
 
                 # Languages
-                elif (arg == "-targets"):
+                elif (arg == "targets" or arg == "-targets"):
                     echo "Available Compilation Targets:"
                     for target in BACKENDS:
                       echo " > " & target
                     quit()
 
                 # Platforms
-                elif (arg == "-platforms"):
+                elif (arg == "platforms" or arg == "-platforms"):
                     echo "Supported Platforms:"
                     for platform in TARGETS:
                       echo " > " & platform
                     quit()
 
                 # Architectures
-                elif (arg == "-archs"):
+                elif (arg == "archs" or arg == "-archs"):
                     echo "Supported Architectures:"
                     for archItem in ARCHS:
                       echo " > " & archItem
@@ -262,6 +274,8 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 discard
 
             case argv[0]
+            of "interpret", "--interpret", "-interpret":
+                vm_interpret = true
             of "build":
                 vm_build = C_setState("build", true)
             of "disassemble":
@@ -289,8 +303,11 @@ proc parseArgs*(argc: int, argv: seq[string]): void =
                 echo "\e[1mCache Cleared!\e[0m"
                 quit()
             else:
-                echo "gravity: invalid command: " & argv[0]
-                displayHelpMessage()
+                if argv[0].startsWith("-b:interp"):
+                    vm_interpret = true
+                else:
+                    echo "gravity: invalid command: " & argv[0]
+                    displayHelpMessage()
 
     # Error Handling
     if vm_file_in == "":

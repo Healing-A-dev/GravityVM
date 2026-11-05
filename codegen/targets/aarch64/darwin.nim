@@ -19,7 +19,13 @@ proc setSection(sec: string): string =
 
 proc resolveReg(arg: string): string =
     var clean = arg.replace("!", "").replace("[", "").replace("]", "")
-    if clean.contains("sra") or clean == "%rax": return "x0"
+    if clean.contains("sra") or clean == "%rax" or clean == "r0": return "x0"
+    if clean.startsWith("r"):
+        try:
+            let rIdx = parseInt(clean[1..^1])
+            if rIdx >= 0 and rIdx <= 15:
+                return "x" & $rIdx
+        except: discard
     if clean.contains("srb") or clean == "%rbx": return "x1"
     if clean.contains("src") or clean == "%rcx": return "x2"
     if clean.contains("srd") or clean == "%rdx": return "x3"
@@ -282,6 +288,8 @@ aarch64_darwin["ADD"] = proc(d0, d1, d2: string): string =
     s.add(loadVal(d1, "x9"))
     s.add("    add x0, x0, x9\n")
     s.add("    sub x0, x0, #1\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
     return s
 
 aarch64_darwin["SUB"] = proc(d0, d1, d2: string): string =
@@ -290,6 +298,8 @@ aarch64_darwin["SUB"] = proc(d0, d1, d2: string): string =
     s.add(loadVal(d1, "x9"))
     s.add("    sub x0, x0, x9\n")
     s.add("    add x0, x0, #1\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
     return s
 
 aarch64_darwin["MUL"] = proc(d0, d1, d2: string): string =
@@ -301,6 +311,8 @@ aarch64_darwin["MUL"] = proc(d0, d1, d2: string): string =
     s.add("    mul x0, x0, x9\n")
     s.add("    lsl x0, x0, #1\n")
     s.add("    orr x0, x0, #1\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
     return s
 
 aarch64_darwin["DIV"] = proc(d0, d1, d2: string): string =
@@ -312,6 +324,44 @@ aarch64_darwin["DIV"] = proc(d0, d1, d2: string): string =
     s.add("    sdiv x0, x0, x9\n")
     s.add("    lsl x0, x0, #1\n")
     s.add("    orr x0, x0, #1\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
+    return s
+
+aarch64_darwin["IADD"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text")
+    s.add(loadVal(d0, "x0"))
+    s.add(loadVal(d1, "x9"))
+    s.add("    add x0, x0, x9\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
+    return s
+
+aarch64_darwin["ISUB"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text")
+    s.add(loadVal(d0, "x0"))
+    s.add(loadVal(d1, "x9"))
+    s.add("    sub x0, x0, x9\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
+    return s
+
+aarch64_darwin["IMUL"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text")
+    s.add(loadVal(d0, "x0"))
+    s.add(loadVal(d1, "x9"))
+    s.add("    mul x0, x0, x9\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
+    return s
+
+aarch64_darwin["IDIV"] = proc(d0, d1, d2: string): string =
+    var s = setSection(".text")
+    s.add(loadVal(d0, "x0"))
+    s.add(loadVal(d1, "x9"))
+    s.add("    sdiv x0, x0, x9\n")
+    if d2 != "" and d2 != "00" and d2 != "0":
+        s.add(storeVal("x0", d2))
     return s
 
 aarch64_darwin["INC"] = proc(d0, d1, d2: string): string =

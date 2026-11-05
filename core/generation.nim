@@ -5,6 +5,8 @@ import cli
 import memory
 import streams
 
+var gvm_bytecode_version*: uint8 = 1
+
 proc decodeOpcode(val: uint8): string =
   var v = int(val)
   var res = ""
@@ -41,10 +43,16 @@ proc generateInstructions*(file: string): seq[string] =
 
     let magic = strm.readStr(3)
     let version = strm.readUint8()
+    gvm_bytecode_version = version
 
     if magic != "GVM":
         echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
         echo "|> Reason: Not a valid GravityVM binary."
+        quit(1)
+
+    if version != 1 and version != 2:
+        echo "\e[1mgravity: <\e[91mFATAL-Error\e[0m\e[1m>\e[0m"
+        echo "|> Reason: Unsupported GravityVM bytecode version <" & $version & "> (supported: 1, 2)"
         quit(1)
 
     let instructionCount = strm.readUint32()

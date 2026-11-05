@@ -129,6 +129,25 @@ vm_transpiler_<LANGUAGE_NAME>["DIV"] = proc(d0: string, d1: string, d2: string):
 vm_transpiler_<LANGUAGE_NAME>["EXP"] = proc(d0: string, d1: string, d2: string): string =
     return "    sra = TAG(Math.pow(UNTAG(" & resolve<LANGUAGE_NAME>(d0) & "), UNTAG(" & resolve<LANGUAGE_NAME>(d1) & ")));\n"
 
+# ==============================================================================
+# Raw 64-Bit Integer Arithmetic
+# ==============================================================================
+vm_transpiler_<LANGUAGE_NAME>["IADD"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolve<LANGUAGE_NAME>(d2) else: "r0"
+    return "    " & dest & " = (" & resolve<LANGUAGE_NAME>(d0) & ") + (" & resolve<LANGUAGE_NAME>(d1) & ");\n"
+
+vm_transpiler_<LANGUAGE_NAME>["ISUB"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolve<LANGUAGE_NAME>(d2) else: "r0"
+    return "    " & dest & " = (" & resolve<LANGUAGE_NAME>(d0) & ") - (" & resolve<LANGUAGE_NAME>(d1) & ");\n"
+
+vm_transpiler_<LANGUAGE_NAME>["IMUL"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolve<LANGUAGE_NAME>(d2) else: "r0"
+    return "    " & dest & " = (" & resolve<LANGUAGE_NAME>(d0) & ") * (" & resolve<LANGUAGE_NAME>(d1) & ");\n"
+
+vm_transpiler_<LANGUAGE_NAME>["IDIV"] = proc(d0: string, d1: string, d2: string): string =
+    let dest = if d2 != "" and d2 != "00" and d2 != "0": resolve<LANGUAGE_NAME>(d2) else: "r0"
+    return "    " & dest & " = (" & resolve<LANGUAGE_NAME>(d0) & ") / (" & resolve<LANGUAGE_NAME>(d1) & ");\n"
+
 vm_transpiler_<LANGUAGE_NAME>["INC"] = proc(d0: string, d1: string, d2: string): string =
     let target = resolve<LANGUAGE_NAME>(d0)
     return "    " & target & " += 2;\n"

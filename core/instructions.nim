@@ -97,6 +97,10 @@ let Instructions*: Table[string, string] = {
     "40":    "MOV",
     "41":    "NSUB",
     "42":    "NADD",
+    "43":    "IADD",
+    "44":    "ISUB",
+    "45":    "IMUL",
+    "46":    "IDIV",
 
     # Networking #
     "50":    "NET_SOCKET",
@@ -115,9 +119,13 @@ let Instructions*: Table[string, string] = {
 proc storeResult(target: string, value: string): int =
     if not COMPILE_MODE:
         var dest = target
-        if dest == "00": dest = "[sra]"
+        if dest == "00" or dest == "0" or dest == "": dest = "r0"
+        let clean = dest.replace("[", "").replace("]", "")
+        if clean.startsWith("r") or clean.startsWith("sr"):
+            REGISTER[clean] = value
+            return 0
         case dest[0]
-        of '[': REGISTER[dest[1..^2]] = value
+        of '[': REGISTER[clean] = value
         of '$': POOL_LOCAL[][dest[1..^1]] = value
         of '@': POOL_GLOBAL[][dest[1..^1]] = value
         of '%': POOL_BUFFER[][dest[1..^1]] = value
@@ -127,6 +135,9 @@ proc storeResult(target: string, value: string): int =
 proc getValue(loc: string): string =
     if loc == "": return "0"
     if not COMPILE_MODE:
+        let clean = loc.replace("[", "").replace("]", "")
+        if clean.startsWith("r") or clean.startsWith("sr"):
+            if REGISTER.hasKey(clean): return REGISTER[clean]
         if loc.startsWith("[") and loc.endsWith("]"):
             let reg = loc[1..^2]
             if REGISTER.hasKey(reg): return REGISTER[reg]
@@ -226,6 +237,18 @@ OP["MUL"] = proc(args: OPARGUMENTS): int =
 OP["DIV"] = proc(args: OPARGUMENTS): int =
     C("TEXT", "__comment", "DIV", "DIV", args.memory_address & " / " & args.arg0)
     C("TEXT", "DIV", args.memory_address, args.arg0, args.arg1); return 0
+OP["IADD"] = proc(args: OPARGUMENTS): int =
+    C("TEXT", "__comment", "IADD", "IADD", args.memory_address & " + " & args.arg0)
+    C("TEXT", "IADD", args.memory_address, args.arg0, args.arg1); return 0
+OP["ISUB"] = proc(args: OPARGUMENTS): int =
+    C("TEXT", "__comment", "ISUB", "ISUB", args.memory_address & " - " & args.arg0)
+    C("TEXT", "ISUB", args.memory_address, args.arg0, args.arg1); return 0
+OP["IMUL"] = proc(args: OPARGUMENTS): int =
+    C("TEXT", "__comment", "IMUL", "IMUL", args.memory_address & " * " & args.arg0)
+    C("TEXT", "IMUL", args.memory_address, args.arg0, args.arg1); return 0
+OP["IDIV"] = proc(args: OPARGUMENTS): int =
+    C("TEXT", "__comment", "IDIV", "IDIV", args.memory_address & " / " & args.arg0)
+    C("TEXT", "IDIV", args.memory_address, args.arg0, args.arg1); return 0
 OP["EXP"] = proc(args: OPARGUMENTS): int =
     C("TEXT", "__comment", "EXP", "EXP", args.memory_address & " ^ " & args.arg0)
     C("TEXT", "EXP", args.memory_address, args.arg0, args.arg1); return 0

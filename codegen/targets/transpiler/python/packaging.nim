@@ -1,6 +1,8 @@
 const python_setup*: string = """
 import sys, os, math
 
+r0 = r1 = r2 = r3 = r4 = r5 = r6 = r7 = 0
+r8 = r9 = r10 = r11 = r12 = r13 = r14 = r15 = 0
 sra = 0
 srb = 0
 src = 0
@@ -50,7 +52,9 @@ class GvmMap:
         self.count = 0
         self.is_map = is_map
 
-gvm_runtime = {
+from collections import defaultdict
+
+gvm_runtime = defaultdict(lambda: lambda *a, **k: 0, {
     "runtime_eq": lambda: 3 if (Brdi == Brsi) else 1,
     "runtime_neq": lambda: 3 if (Brdi != Brsi) else 1,
     "runtime_sub": lambda: TAG(UNTAG(Brdi) - UNTAG(Brsi)),
@@ -68,7 +72,7 @@ gvm_runtime = {
     "sys_argc": lambda: TAG(len(sys.argv)),
     "sys_argv": lambda: 0,
     "exit_program": lambda: sys.exit(UNTAG(Brdi)),
-}
+})
 
 def _runtime_auto_unwrap():
     if Brdi in maps:
@@ -168,7 +172,7 @@ gvm_runtime["string_concat"] = _string_concat
 """
 
 const python_comment_char*: string = "#"
-const python_entry_start*: string = "def main():\n    global sra, srb, src, srd, sre, Brdi, Brsi, Brdx, Brcx, Br8, Br9, G_01, G_02, G_03, G_04, G_05, G_06, G01, G02, G03, G04, G05, G06, rsp, rbp"
+const python_entry_start*: string = "def main():\n    global r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, sra, srb, src, srd, sre, Brdi, Brsi, Brdx, Brcx, Br8, Br9, G_01, G_02, G_03, G_04, G_05, G_06, G01, G02, G03, G04, G05, G06, rsp, rbp"
 const python_entry_end*: string = ""
 const python_entry_call*: string = "if __name__ == '__main__':\n    main()"
 const python_compiler*: string = ""

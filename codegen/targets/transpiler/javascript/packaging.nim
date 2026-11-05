@@ -2,6 +2,8 @@ const js_setup*: string = """
 //---| Required Modules & Variables |---//
 const fs = require('fs');
 
+let r0 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0;
+let r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r13 = 0, r14 = 0, r15 = 0;
 let sra = 0, srb = 0, src = 0, srd = 0, sre = 0;
 let srnl = "\n";
 let Brdi = 0, Brsi = 0, Brdx = 0, Brcx = 0, Br8 = 0, Br9 = 0;
@@ -34,7 +36,7 @@ function gvm_str_cat(a, b) {
 const maps = {};
 let map_counter = 0;
 
-const gvm_runtime = {
+const _gvm_runtime_base = {
     runtime_eq: () => (Brdi === Brsi ? 3 : 1),
     runtime_neq: () => (Brdi !== Brsi ? 3 : 1),
     runtime_sub: () => TAG(UNTAG(Brdi) - UNTAG(Brsi)),
@@ -140,6 +142,9 @@ const gvm_runtime = {
     sys_argc: () => TAG(process.argv.length),
     sys_argv: () => 0,
 };
+const gvm_runtime = new Proxy(_gvm_runtime_base, {
+    get: (target, prop) => (prop in target ? target[prop] : () => 0)
+});
 """
 
 const js_comment_char*: string = "//"

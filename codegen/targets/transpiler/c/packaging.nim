@@ -29,7 +29,10 @@ long long stack[1048576];
 long long rsp = 1048575;
 long long rbp = 1048575;
 double xmm0 = 0.00;
-long long sra = 0, srb = 0, src = 0, srd = 0, sre = 0;
+long long r0 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0;
+long long r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r13 = 0, r14 = 0, r15 = 0;
+#define sra r0
+long long srb = 0, src = 0, srd = 0, sre = 0;
 long long reg_rdi = 0, reg_rsi = 0, reg_r8 = 0, reg_r9 = 0;
 int global_argc;
 char** global_argv;
