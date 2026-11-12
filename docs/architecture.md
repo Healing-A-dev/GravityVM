@@ -210,7 +210,7 @@ High-level languages lacking unstructured gotos or arbitrary stack unwinding use
 
 GravityVM includes an automated hashing cache to avoid redundant compilations:
 - When a file is compiled, its contents and compiler parameters are hashed using SHA-256.
-- Cached signatures and intermediate object outputs are stored in `.g_cache/`.
+- Cached signatures and intermediate object outputs are stored in `~/.cache/GravityVM/entries`.
 - If neither the input bytecode nor the target architecture has changed, compilation completes in under 1 millisecond.
 - Invalidation can be triggered manually via `gvm clean-cache` or automatically when bytecode content changes.
 

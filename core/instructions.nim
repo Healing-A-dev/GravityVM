@@ -214,8 +214,8 @@ OP["STORE"] = proc(args: OPARGUMENTS): int =
         C("DATA", "STORE", dest, src, "")
     else:
         # Register assignment fallback
-        C("VOID", "__comment", "STORE", "STORE REGISTER", src & " => " & dest)
-        C("TEXT", "STORE REGISTER", dest, src, "")
+        C("VOID", "__comment", "STORE", "STORE", src & " => " & dest)
+        C("TEXT", "STORE", dest, src, "")
     return 0
 
 # UPD (UPDATE)

@@ -18,6 +18,7 @@ RUNTIME_NAME = gvm.o
 .PHONY: compile
 
 compile:
+	printf '\033c'
 	$(CMD) c $(RELEASE) $(HINTS) -o:gvm main.nim
 	printf '\033[92mCompilation Completed!\n\033[0m'
 

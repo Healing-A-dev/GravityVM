@@ -261,7 +261,7 @@ proc C_transpile*(): void =
 proc C_compile*(): int =
     var files: seq[string] = @[c_tmp, c_output, c_output & ".gvm.o"]
     var exit_code: int = 0
-    var status: string = "\e[32m[Assemble]\e[0m "
+    var status: string = "\e[32m#assemble\e[0m "
     let arch = if vm_architecture.isNil or vm_architecture[] == "": "amd64" else: vm_architecture[]
     let target = if vm_target.isNil or vm_target[] == "": "linux" else: vm_target[]
 
@@ -269,12 +269,12 @@ proc C_compile*(): int =
     if target == "darwin":
         let triple = if arch == "aarch64": "arm64-apple-darwin" else: "x86_64-apple-darwin"
         exit_code = execCmd("clang -target " & triple & " -c -o " & files[2] & " " & files[0])
-        if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+        if exit_code != 0: status = "\e[91m#assemble\e[0m "
         if c_verbose: echo status & "clang -target " & triple & " -c -o " & files[2] & " " & files[0]
 
         if exit_code == 0 and not c_generateObjectFile:
             exit_code = execCmd("clang -target " & triple & " -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
-            status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+            status = if exit_code == 0: "\e[32m#link\e[0m " else: "\e[91m#link\e[0m "
             if c_verbose: echo status & "clang -target " & triple & " -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
         if exit_code == 0 and c_generateObjectFile:
@@ -283,12 +283,12 @@ proc C_compile*(): int =
     # AArch64 Linux
     elif arch == "aarch64" and target == "linux":
         exit_code = execCmd("clang -target aarch64-linux-gnu -c -o " & files[2] & " " & files[0])
-        if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+        if exit_code != 0: status = "\e[91m#assemble\e[0m "
         if c_verbose: echo status & "clang -target aarch64-linux-gnu -c -o " & files[2] & " " & files[0]
 
         if exit_code == 0 and not c_generateObjectFile:
             exit_code = execCmd("clang -target aarch64-linux-gnu -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
-            status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+            status = if exit_code == 0: "\e[32m#link\e[0m " else: "\e[91m#link\e[0m "
             if c_verbose: echo status & "clang -target aarch64-linux-gnu -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
         if exit_code == 0 and c_generateObjectFile:
@@ -298,34 +298,34 @@ proc C_compile*(): int =
     elif target == "win64":
         if arch == "aarch64":
             exit_code = execCmd("clang -target aarch64-w64-windows-gnu -c -o " & files[2] & " " & files[0])
-            if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+            if exit_code != 0: status = "\e[91m#assemble\e[0m "
             if c_verbose: echo status & "clang -target aarch64-w64-windows-gnu -c -o " & files[2] & " " & files[0]
 
             if exit_code == 0 and not c_generateObjectFile:
                 exit_code = execCmd("clang -target aarch64-w64-windows-gnu " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" "))
-                status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+                status = if exit_code == 0: "\e[32m#link\e[0m " else: "\e[91m#link\e[0m "
                 if c_verbose: echo status & "clang -target aarch64-w64-windows-gnu " & files[2] & " -o " & files[1] & ".exe"
             if exit_code == 0 and c_generateObjectFile:
                 exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
         elif vm_isWin64_CPC[]:
             exit_code = execCmd("x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2")
-            if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+            if exit_code != 0: status = "\e[91m#assemble\e[0m "
             if c_verbose: echo status & "x86_64-w64-mingw32-as -o " & files[2] & " " & files[0] & " -O2"
 
             if exit_code == 0 and not c_generateObjectFile:
                 exit_code = execCmd("x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32 -lbcrypt -lmswsock")
-                status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+                status = if exit_code == 0: "\e[32m#link\e[0m " else: "\e[91m#link\e[0m "
                 if c_verbose: echo status & "x86_64-w64-mingw32-gcc " & files[2] & " -o " & files[1] & ".exe"
             if exit_code == 0 and c_generateObjectFile:
                 exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
         else:
             exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
-            if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+            if exit_code != 0: status = "\e[91m#assemble\e[0m "
             if c_verbose: echo status & "as -o " & files[2] & " " & files[0] & " -O2"
 
             if exit_code == 0 and not c_generateObjectFile:
                 exit_code = execCmd("gcc " & files[2] & " -o " & files[1] & ".exe " & c_linkerfiles.join(" ") & " -nostdlib -lkernel32 -lws2_32")
-                status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+                status = if exit_code == 0: "\e[32m#link\e[0m " else: "\e[91m#link\e[0m "
                 if c_verbose: echo status & "gcc " & files[2] & " -o " & files[1] & ".exe"
             if exit_code == 0 and c_generateObjectFile:
                 exit_code = execCmd("cp " & files[2] & " " & files[1] & ".o")
@@ -334,17 +334,17 @@ proc C_compile*(): int =
     else:
         if c_generateObjectFile: files[2] = "_" & files[2]
         exit_code = execCmd("as -o " & files[2] & " " & files[0] & " -O2")
-        if exit_code != 0: status = "\e[91m[Assemble]\e[0m "
+        if exit_code != 0: status = "\e[91m#assemble\e[0m "
         if c_verbose: echo status & "as -o " & files[2] & " " & files[0] & " -O2"
 
         if exit_code == 0 and not c_generateObjectFile:
             exit_code = execCmd("ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" "))
-            status = if exit_code == 0: "\e[32m[Link]\e[0m " else: "\e[91m[Link]\e[0m "
+            status = if exit_code == 0: "\e[32m#link\e[0m " else: "\e[91m#link\e[0m "
             if c_verbose: echo status & "ld -o " & files[1] & " " & files[2] & " " & c_linkerfiles.join(" ")
 
         if exit_code == 0 and c_generateObjectFile:
             exit_code = execCmd("ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" "))
-            status = if exit_code == 0: "\e[32m[Link->Object]\e[0m " else: "\e[91m[Link->Object]\e[0m "
+            status = if exit_code == 0: "\e[32m#link->object\e[0m " else: "\e[91m#link->object\e[0m "
             if c_verbose: echo status & "ld -r -o " & files[1] & ".o " & files[2] & " " & c_linkerfiles.join(" ")
 
     # Cleanup
@@ -352,9 +352,9 @@ proc C_compile*(): int =
         if c_generateObjectFile:
             files[2] = ""
         files[1] = ""
-        status = "\e[32m[Cleanup]\e[0m "
+        status = "\e[32m#cleanup\e[0m "
         exit_code = execCmd("rm " & files.join(" "))
-        if exit_code != 0: status = "\e[91m[Cleanup]\e[0m "
+        if exit_code != 0: status = "\e[91m#cleanup\e[0m "
         if c_verbose: echo status & "rm " & files.join(" ")
 
     return exit_code
@@ -382,7 +382,7 @@ proc C_run*(): int =
         execCmdStr = "qemu-aarch64 " & execCmdStr
 
     if c_verbose:
-        echo "\e[32m[Exec]\e[0m " & execCmdStr
+        echo "\e[32m#exec\e[0m " & execCmdStr
     return execCmd(execCmdStr & " " & c_runarguments.join(" "))
 
 
@@ -394,18 +394,18 @@ proc buildC(compiler: string, output_command: string = "-o"): void =
     if c_linkerfiles.len > 0:
         linkerFlags = " " & c_linkerfiles.join(" ")
     var status: int = execCmd(compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags)
-    var tag: string = "\e[32m[" & c_c.titleize & "]\e[0m"
+    var tag: string = "\e[32m#" & c_c.toLowerAscii & "\e[0m"
     if status != 0:
-        tag = "\e[91m[" & c_c.titleize & "]\e[0m"
+        tag = "\e[91m#" & c_c.toLowerAscii & "\e[0m"
 
     if c_verbose:
         echo tag & " " & compiler & " " & output_command & " " & c_output & " " & c_tmp & linkerFlags
 
     if c_clean:
-        tag = "\e[32m[Cleanup]\e[0m"
+        tag = "\e[32m#cleanup\e[0m"
         status = execCmd("rm " & c_tmp)
         if status != 0:
-            tag = "\e[91m[Cleanup]\e[0m"
+            tag = "\e[91m#cleanup\e[0m"
 
         if c_verbose:
             echo tag & " rm " & c_tmp
